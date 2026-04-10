@@ -2,15 +2,20 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth/auth-context';
-import { getFamilyMembers } from '@/lib/family/family-service';
+import { getFamilyMembers, removeFamilyMember } from '@/lib/family/family-service';
 import { UserProfile } from '@/types';
-import { Users, Crown, Copy, Check, Trophy } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { Users, Crown, Copy, Check, Trophy, UserMinus, LogOut, AlertTriangle } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useRouter } from 'next/navigation';
 
 export default function FamilyPage() {
-  const { profile, family } = useAuth();
+  const { profile, family, refreshFamily } = useAuth();
+  const router = useRouter();
   const [members, setMembers] = useState<UserProfile[]>([]);
   const [copied, setCopied] = useState(false);
+  const [confirmLeave, setConfirmLeave] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (!family) return;
@@ -20,12 +25,39 @@ export default function FamilyPage() {
   }, [family]);
 
   const sorted = [...members].sort((a, b) => (b.points ?? 0) - (a.points ?? 0));
+  const isOwner = profile?.id === family?.ownerId;
 
   async function copyCode() {
     if (!family) return;
     await navigator.clipboard.writeText(family.inviteCode);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  }
+
+  async function leaveFamily() {
+    if (!profile?.familyId || !profile?.id) return;
+    setLoading(true);
+    try {
+      await removeFamilyMember(profile.familyId, profile.id);
+      await refreshFamily();
+      router.replace('/onboarding');
+    } finally {
+      setLoading(false);
+      setConfirmLeave(false);
+    }
+  }
+
+  async function removeMember(userId: string) {
+    if (!family?.id) return;
+    setLoading(true);
+    try {
+      await removeFamilyMember(family.id, userId);
+      setMembers((prev) => prev.filter((m) => m.id !== userId));
+      await refreshFamily();
+    } finally {
+      setLoading(false);
+      setConfirmRemove(null);
+    }
   }
 
   if (!family) return null;
@@ -37,7 +69,7 @@ export default function FamilyPage() {
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-pink-500 to-rose-500 flex items-center justify-center shadow-lg">
             <Users className="w-6 h-6 text-white" />
           </div>
-          <div>
+          <div className="flex-1">
             <h1 className="text-2xl font-bold">{family.name}</h1>
             <p className="text-sm text-ink-500">
               {family.members.length} Mitglied{family.members.length !== 1 && 'er'}
@@ -121,10 +153,123 @@ export default function FamilyPage() {
                 <div className="font-bold text-amber-500">{m.points ?? 0}</div>
                 <div className="text-[10px] text-ink-500 uppercase">Punkte</div>
               </div>
+              {/* Owner can remove non-owner members */}
+              {isOwner && m.id !== profile?.id && (
+                <button
+                  onClick={() => setConfirmRemove(m.id)}
+                  className="p-1.5 rounded-lg text-ink-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition"
+                >
+                  <UserMinus className="w-4 h-4" />
+                </button>
+              )}
             </motion.div>
           ))}
         </div>
       </div>
+
+      {/* Leave family (non-owners only) */}
+      {!isOwner && (
+        <button
+          onClick={() => setConfirmLeave(true)}
+          className="w-full py-3 rounded-2xl border border-red-200 dark:border-red-900 text-red-500 font-semibold flex items-center justify-center gap-2 hover:bg-red-50 dark:hover:bg-red-950/30 transition"
+        >
+          <LogOut className="w-4 h-4" /> Familie verlassen
+        </button>
+      )}
+
+      {/* Confirm: Leave */}
+      <AnimatePresence>
+        {confirmLeave && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm p-4"
+            onClick={() => setConfirmLeave(false)}
+          >
+            <motion.div
+              initial={{ y: 60, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 60, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-sm bg-white dark:bg-ink-900 rounded-3xl p-6 space-y-4 shadow-2xl"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-red-100 dark:bg-red-950/40 flex items-center justify-center">
+                  <AlertTriangle className="w-6 h-6 text-red-500" />
+                </div>
+                <div>
+                  <div className="font-bold text-lg">Familie verlassen?</div>
+                  <div className="text-sm text-ink-500">Dies kann nicht rückgängig gemacht werden.</div>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setConfirmLeave(false)}
+                  className="flex-1 py-3 rounded-2xl bg-ink-100 dark:bg-ink-800 font-semibold text-sm"
+                >
+                  Abbrechen
+                </button>
+                <button
+                  onClick={leaveFamily}
+                  disabled={loading}
+                  className="flex-1 py-3 rounded-2xl bg-red-500 text-white font-semibold text-sm disabled:opacity-50"
+                >
+                  {loading ? 'Moment…' : 'Verlassen'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Confirm: Remove member */}
+      <AnimatePresence>
+        {confirmRemove && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm p-4"
+            onClick={() => setConfirmRemove(null)}
+          >
+            <motion.div
+              initial={{ y: 60, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 60, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-sm bg-white dark:bg-ink-900 rounded-3xl p-6 space-y-4 shadow-2xl"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-red-100 dark:bg-red-950/40 flex items-center justify-center">
+                  <UserMinus className="w-6 h-6 text-red-500" />
+                </div>
+                <div>
+                  <div className="font-bold text-lg">Mitglied entfernen?</div>
+                  <div className="text-sm text-ink-500">
+                    {members.find((m) => m.id === confirmRemove)?.displayName} wird aus der Familie entfernt.
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setConfirmRemove(null)}
+                  className="flex-1 py-3 rounded-2xl bg-ink-100 dark:bg-ink-800 font-semibold text-sm"
+                >
+                  Abbrechen
+                </button>
+                <button
+                  onClick={() => removeMember(confirmRemove)}
+                  disabled={loading}
+                  className="flex-1 py-3 rounded-2xl bg-red-500 text-white font-semibold text-sm disabled:opacity-50"
+                >
+                  {loading ? 'Moment…' : 'Entfernen'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
