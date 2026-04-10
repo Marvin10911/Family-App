@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -8,29 +8,49 @@ import { Sparkles, Mail, Lock, ArrowRight } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { signIn } = useAuth();
+  const { signIn, user, profile, loading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // If already logged in with family → go straight to dashboard
+  useEffect(() => {
+    if (!loading && user && profile?.familyId) {
+      router.replace('/dashboard');
+    } else if (!loading && user && !profile?.familyId) {
+      router.replace('/onboarding');
+    }
+  }, [loading, user, profile, router]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
+    setSubmitting(true);
     setError(null);
     try {
       await signIn(email, password);
-      router.push('/dashboard');
+      // Auth state change handled by useEffect above
     } catch (err: any) {
-      setError(
-        err.code === 'auth/invalid-credential'
-          ? 'Ungültige Zugangsdaten'
-          : 'Anmeldung fehlgeschlagen'
-      );
-    } finally {
-      setLoading(false);
+      const code: string = err?.code ?? '';
+      if (
+        code === 'auth/invalid-credential' ||
+        code === 'auth/wrong-password' ||
+        code === 'auth/user-not-found'
+      ) {
+        setError('E-Mail oder Passwort falsch.');
+      } else if (code === 'auth/too-many-requests') {
+        setError('Zu viele Versuche. Bitte kurz warten.');
+      } else if (code === 'auth/network-request-failed') {
+        setError('Keine Internetverbindung.');
+      } else {
+        setError(`Fehler: ${err?.message ?? 'Anmeldung fehlgeschlagen'}`);
+      }
+      setSubmitting(false);
     }
   }
+
+  // While auth is resolving, show nothing (avoids flash)
+  if (loading) return null;
 
   return (
     <div className="w-full max-w-md">
@@ -77,11 +97,11 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={submitting}
             className="btn-primary w-full py-3.5"
           >
-            {loading ? 'Anmelden…' : 'Anmelden'}
-            <ArrowRight className="w-4 h-4" />
+            {submitting ? 'Anmelden…' : 'Anmelden'}
+            {!submitting && <ArrowRight className="w-4 h-4" />}
           </button>
         </form>
 

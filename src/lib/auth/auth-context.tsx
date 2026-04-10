@@ -5,6 +5,7 @@ import {
   useContext,
   useEffect,
   useState,
+  useRef,
   ReactNode,
   useCallback,
 } from 'react';
@@ -25,11 +26,7 @@ import {
   updateDoc,
 } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase/client';
-import {
-  UserProfile,
-  Family,
-  DEFAULT_PERMISSIONS,
-} from '@/types';
+import { UserProfile, Family, DEFAULT_PERMISSIONS } from '@/types';
 import { generateAvatarColor } from '@/lib/utils';
 
 interface AuthContextValue {
@@ -51,9 +48,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [family, setFamily] = useState<Family | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Hold the inner profile-listener unsubscribe so we can tear it down cleanly
+  const profileUnsubRef = useRef<(() => void) | null>(null);
+
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+    if (!auth) {
+      setLoading(false);
+      return;
+    }
+
+    const unsubAuth = onAuthStateChanged(auth, (fbUser) => {
+      // Tear down previous profile listener whenever the auth user changes
+      if (profileUnsubRef.current) {
+        profileUnsubRef.current();
+        profileUnsubRef.current = null;
+      }
+
       setUser(fbUser);
+
       if (!fbUser) {
         setProfile(null);
         setFamily(null);
@@ -61,39 +73,65 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      // Listen to profile changes
+      // Subscribe to the user's profile document
       const userRef = doc(db, 'users', fbUser.uid);
-      const unsubProfile = onSnapshot(userRef, async (snap) => {
-        if (snap.exists()) {
+      const unsubProfile = onSnapshot(
+        userRef,
+        async (snap) => {
+          if (!snap.exists()) {
+            // Profile not yet written (e.g. registration still in progress)
+            setProfile(null);
+            setFamily(null);
+            setLoading(false);
+            return;
+          }
+
           const data = { id: snap.id, ...snap.data() } as UserProfile;
           setProfile(data);
 
           if (data.familyId) {
-            const famRef = doc(db, 'families', data.familyId);
-            const famSnap = await getDoc(famRef);
-            if (famSnap.exists()) {
-              setFamily({ id: famSnap.id, ...famSnap.data() } as Family);
+            try {
+              const famSnap = await getDoc(doc(db, 'families', data.familyId));
+              setFamily(
+                famSnap.exists()
+                  ? ({ id: famSnap.id, ...famSnap.data() } as Family)
+                  : null
+              );
+            } catch {
+              setFamily(null);
             }
           } else {
             setFamily(null);
           }
+
+          setLoading(false);
+        },
+        (_err) => {
+          // Firestore error (e.g. rules block) — still resolve loading
+          setProfile(null);
+          setFamily(null);
+          setLoading(false);
         }
-        setLoading(false);
-      });
+      );
 
-      // Update last seen
-      try {
-        await updateDoc(userRef, { lastSeen: serverTimestamp() });
-      } catch {}
+      profileUnsubRef.current = unsubProfile;
 
-      return () => unsubProfile();
+      // Fire-and-forget last-seen update (non-critical)
+      updateDoc(userRef, { lastSeen: serverTimestamp() }).catch(() => {});
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubAuth();
+      if (profileUnsubRef.current) {
+        profileUnsubRef.current();
+        profileUnsubRef.current = null;
+      }
+    };
   }, []);
 
   const signIn = useCallback(async (email: string, password: string) => {
     await signInWithEmailAndPassword(auth, email, password);
+    // loading will be set to false by the onSnapshot callback above
   }, []);
 
   const signUp = useCallback(
@@ -101,7 +139,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const cred = await createUserWithEmailAndPassword(auth, email, password);
       await updateProfile(cred.user, { displayName });
 
-      const profileData: Omit<UserProfile, 'id'> = {
+      await setDoc(doc(db, 'users', cred.user.uid), {
         email,
         displayName,
         avatarColor: generateAvatarColor(email),
@@ -109,11 +147,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         role: 'owner',
         permissions: DEFAULT_PERMISSIONS.owner,
         points: 0,
-        createdAt: serverTimestamp() as any,
-        lastSeen: serverTimestamp() as any,
-      };
-
-      await setDoc(doc(db, 'users', cred.user.uid), profileData);
+        createdAt: serverTimestamp(),
+        lastSeen: serverTimestamp(),
+      });
+      // The onSnapshot listener will pick up the new doc and set loading=false
     },
     []
   );
