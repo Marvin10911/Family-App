@@ -15,6 +15,7 @@ import {
 import { db } from '@/lib/firebase/client';
 import { ShoppingItem, ShoppingCategory } from '@/types';
 import { Plus, Sparkles, ShoppingCart, Check, X, ListFilter } from 'lucide-react';
+import { getItemEmoji } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
 
@@ -125,7 +126,7 @@ export default function ShoppingPage() {
       quantity: manualQty,
       unit: manualUnit,
       category: 'Sonstiges',
-      emoji: '',
+      emoji: getItemEmoji(input.trim()),
       checked: false,
       addedBy: profile.id,
       aiSuggested: false,
@@ -218,7 +219,10 @@ export default function ShoppingPage() {
               className="overflow-hidden"
             >
               <div className="mt-3 pt-3 border-t border-ink-100 dark:border-ink-700">
-                <div className="text-sm font-medium mb-2">
+                <div className="text-sm font-medium mb-2 flex items-center gap-2">
+                  {getItemEmoji(input) && (
+                    <span className="text-2xl">{getItemEmoji(input)}</span>
+                  )}
                   Wie viel von <span className="text-violet-500">"{input}"</span>?
                 </div>
                 <div className="flex items-center gap-2">

@@ -88,3 +88,109 @@ export function formatRelativeDate(date: Date): string {
   if (days > 0 && days < 7) return `In ${days} Tagen`;
   return formatDateShort(date);
 }
+
+const FOOD_EMOJI_MAP: [string[], string][] = [
+  // Obst
+  [['apfel', 'apple', 'äpfel'], '🍎'],
+  [['birne', 'birnen'], '🍐'],
+  [['banane', 'bananen'], '🍌'],
+  [['orange', 'orangen', 'mandarine', 'mandarinen', 'clementine'], '🍊'],
+  [['zitrone', 'zitronen', 'limette'], '🍋'],
+  [['erdbeere', 'erdbeeren'], '🍓'],
+  [['traube', 'trauben', 'weintraube'], '🍇'],
+  [['melone', 'wassermelone'], '🍉'],
+  [['pfirsich', 'nektarine'], '🍑'],
+  [['kirsche', 'kirschen'], '🍒'],
+  [['ananas'], '🍍'],
+  [['mango', 'mangos'], '🥭'],
+  [['kiwi'], '🥝'],
+  [['avocado'], '🥑'],
+  [['kokosnuss', 'kokos'], '🥥'],
+  [['pflaume', 'pflaumen'], '🍑'],
+  [['heidelbeere', 'heidelbeeren', 'blaubeere', 'blaubeeren'], '🫐'],
+  // Gemüse
+  [['tomate', 'tomaten', 'cherrytomaten'], '🍅'],
+  [['karotte', 'karotten', 'möhre', 'möhren'], '🥕'],
+  [['brokkoli'], '🥦'],
+  [['salat', 'eisbergsalat', 'kopfsalat', 'feldsalat', 'rucola'], '🥬'],
+  [['gurke', 'gurken'], '🥒'],
+  [['paprika'], '🫑'],
+  [['zwiebel', 'zwiebeln', 'rote zwiebel'], '🧅'],
+  [['knoblauch'], '🧄'],
+  [['kartoffel', 'kartoffeln', 'süßkartoffel'], '🥔'],
+  [['champignon', 'pilze', 'pilz', 'steinpilz'], '🍄'],
+  [['mais', 'maiskolben'], '🌽'],
+  [['aubergine'], '🍆'],
+  [['zucchini'], '🥒'],
+  [['spinat', 'grünkohl'], '🥬'],
+  [['sellerie', 'staudensellerie'], '🥬'],
+  [['lauch', 'porree'], '🧅'],
+  [['blumenkohl'], '🥦'],
+  [['erbsen', 'erbse'], '🫛'],
+  [['bohnen', 'bohne', 'grüne bohnen'], '🫘'],
+  [['ingwer'], '🫚'],
+  [['chili', 'chilis', 'peperoni'], '🌶️'],
+  // Milchprodukte
+  [['milch', 'vollmilch', 'hafermilch', 'mandelmilch', 'sojamilch'], '🥛'],
+  [['käse', 'gouda', 'edamer', 'parmesan', 'mozzarella', 'camembert', 'brie', 'feta'], '🧀'],
+  [['butter'], '🧈'],
+  [['joghurt', 'quark', 'skyr'], '🥛'],
+  [['sahne', 'schlagsahne', 'crème fraîche', 'schmand'], '🥛'],
+  [['eier', 'ei', 'hühnereier'], '🥚'],
+  // Fleisch & Fisch
+  [['hühnchen', 'hähnchen', 'huhn', 'pute', 'putenbrust', 'hühnerbrust'], '🍗'],
+  [['rind', 'rindfleisch', 'hackfleisch', 'beef', 'steak'], '🥩'],
+  [['schwein', 'schweinefleisch', 'speck', 'schinken', 'salami', 'wurst', 'bratwurst', 'würstchen'], '🥓'],
+  [['lachs', 'thunfisch', 'forelle', 'kabeljau', 'fisch', 'filet'], '🐟'],
+  [['garnelen', 'shrimps', 'meeresfrüchte'], '🦐'],
+  // Backwaren
+  [['brot', 'vollkornbrot', 'toast', 'toastbrot', 'baguette'], '🍞'],
+  [['brötchen', 'semmel', 'croissant'], '🥐'],
+  [['kuchen', 'torte', 'muffin'], '🎂'],
+  [['mehl', 'weizenmehl', 'dinkelmehl'], '🌾'],
+  [['zucker', 'puderzucker', 'brauner zucker'], '🍬'],
+  // Getränke
+  [['wasser', 'mineralwasser', 'sprudelwasser'], '💧'],
+  [['saft', 'orangensaft', 'apfelsaft'], '🧃'],
+  [['cola', 'limonade', 'fanta', 'sprite'], '🥤'],
+  [['kaffee', 'espresso', 'cappuccino'], '☕'],
+  [['tee', 'kräutertee', 'grüner tee'], '🍵'],
+  [['wein', 'rotwein', 'weißwein', 'sekt', 'prosecco'], '🍷'],
+  [['bier'], '🍺'],
+  [['smoothie', 'shake'], '🥤'],
+  // Snacks & Süßes
+  [['schokolade', 'schoko', 'nutella', 'kakao'], '🍫'],
+  [['chips', 'crisps', 'snack', 'popcorn'], '🍿'],
+  [['keks', 'kekse', 'cookies'], '🍪'],
+  [['gummibärchen', 'bonbons', 'süßigkeiten'], '🍬'],
+  [['eis', 'eiscrème', 'speiseeis'], '🍦'],
+  [['honig'], '🍯'],
+  [['marmelade', 'konfitüre'], '🍓'],
+  // Basics & Gewürze
+  [['nudeln', 'pasta', 'spaghetti', 'penne', 'tagliatelle'], '🍝'],
+  [['reis'], '🍚'],
+  [['öl', 'olivenöl', 'sonnenblumenöl', 'rapsöl'], '🫙'],
+  [['essig', 'balsamico'], '🫙'],
+  [['salz'], '🧂'],
+  [['pfeffer'], '🌶️'],
+  [['mayonnaise', 'mayo', 'ketchup', 'senf', 'soße', 'sauce'], '🥫'],
+  [['tomatenmark', 'tomatensauce', 'passata'], '🥫'],
+  [['linsen', 'kichererbsen'], '🫘'],
+  [['müsli', 'haferflocken', 'cornflakes', 'granola'], '🌾'],
+  // Haushalt
+  [['toilettenpapier', 'klopapier', 'taschentücher'], '🧻'],
+  [['spülmittel', 'waschmittel', 'reiniger', 'putzmittel'], '🧴'],
+  [['zahnpasta', 'zahnbürste'], '🪥'],
+  [['shampoo', 'duschgel', 'seife'], '🧴'],
+  [['müllbeutel', 'mülltüten'], '🗑️'],
+  [['alufolie', 'frischhaltefolie', 'backpapier'], '📦'],
+  [['batterien', 'batterie'], '🔋'],
+];
+
+export function getItemEmoji(name: string): string {
+  const lower = name.toLowerCase().trim();
+  for (const [keywords, emoji] of FOOD_EMOJI_MAP) {
+    if (keywords.some((k) => lower.includes(k))) return emoji;
+  }
+  return '';
+}
