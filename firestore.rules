@@ -2,83 +2,75 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // Helper: is the request from a signed-in user?
     function isSignedIn() {
       return request.auth != null;
     }
 
-    function isSelf(userId) {
-      return request.auth.uid == userId;
-    }
-
-    function userFamilyId() {
+    // Helper: get the caller's familyId from their profile
+    function callerFamilyId() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.familyId;
     }
 
-    function isInFamily(familyId) {
-      return userFamilyId() == familyId;
+    // Helper: is the caller in the given family?
+    function inFamily(familyId) {
+      return isSignedIn() && callerFamilyId() == familyId;
     }
 
-    function isFamilyAdmin(familyId) {
-      let role = get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
-      return userFamilyId() == familyId && (role == 'owner' || role == 'admin');
-    }
-
-    // Users
+    // ── Users ──────────────────────────────────────────────────────────────
     match /users/{userId} {
+      // Anyone signed in can read any user profile (needed to show family members)
       allow read: if isSignedIn();
-      allow create: if isSelf(userId);
-      allow update: if isSelf(userId) ||
-                     (isSignedIn() && resource.data.familyId != null &&
-                      isFamilyAdmin(resource.data.familyId));
-      allow delete: if isSelf(userId);
+
+      // Only the user themselves can create their own profile
+      allow create: if isSignedIn() && request.auth.uid == userId;
+
+      // User can update their own doc; family/role changes go through Admin SDK (API routes)
+      allow update: if isSignedIn() && request.auth.uid == userId;
+
+      allow delete: if isSignedIn() && request.auth.uid == userId;
     }
 
-    // Families
+    // ── Families ───────────────────────────────────────────────────────────
     match /families/{familyId} {
-      allow read: if isSignedIn() && (
-        resource == null || request.auth.uid in resource.data.members
-      );
-      allow list: if isSignedIn();
-      allow create: if isSignedIn() && request.auth.uid == request.resource.data.ownerId;
-      allow update: if isSignedIn() && (
-        request.auth.uid in resource.data.members
-      );
-      allow delete: if isSignedIn() && request.auth.uid == resource.data.ownerId;
+      // Members can read their family
+      allow read: if isSignedIn() && request.auth.uid in resource.data.members;
+
+      // Listing families is needed for invite-code lookup (done via Admin SDK API route)
+      // Direct client create/update/delete is blocked — use API routes instead
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
-    // Shopping items
-    match /shoppingItems/{itemId} {
-      allow read: if isSignedIn() && isInFamily(resource.data.familyId);
-      allow create: if isSignedIn() && isInFamily(request.resource.data.familyId);
-      allow update, delete: if isSignedIn() && isInFamily(resource.data.familyId);
+    // ── Family data collections ────────────────────────────────────────────
+    // Shopping, Tasks, Meals, Calendar, Waste — all follow the same pattern:
+    // only members of the same family can read/write
+
+    match /shoppingItems/{id} {
+      allow read, write: if inFamily(resource.data.familyId);
+      allow create: if isSignedIn() && callerFamilyId() == request.resource.data.familyId;
     }
 
-    // Tasks
-    match /tasks/{taskId} {
-      allow read: if isSignedIn() && isInFamily(resource.data.familyId);
-      allow create: if isSignedIn() && isInFamily(request.resource.data.familyId);
-      allow update, delete: if isSignedIn() && isInFamily(resource.data.familyId);
+    match /tasks/{id} {
+      allow read, write: if inFamily(resource.data.familyId);
+      allow create: if isSignedIn() && callerFamilyId() == request.resource.data.familyId;
     }
 
-    // Meal plans
-    match /mealPlans/{planId} {
-      allow read: if isSignedIn() && isInFamily(resource.data.familyId);
-      allow create: if isSignedIn() && isInFamily(request.resource.data.familyId);
-      allow update, delete: if isSignedIn() && isInFamily(resource.data.familyId);
+    match /mealPlans/{id} {
+      allow read, write: if inFamily(resource.data.familyId);
+      allow create: if isSignedIn() && callerFamilyId() == request.resource.data.familyId;
     }
 
-    // Calendar events
-    match /calendarEvents/{eventId} {
-      allow read: if isSignedIn() && isInFamily(resource.data.familyId);
-      allow create: if isSignedIn() && isInFamily(request.resource.data.familyId);
-      allow update, delete: if isSignedIn() && isInFamily(resource.data.familyId);
+    match /calendarEvents/{id} {
+      allow read, write: if inFamily(resource.data.familyId);
+      allow create: if isSignedIn() && callerFamilyId() == request.resource.data.familyId;
     }
 
-    // Waste entries
-    match /wasteEntries/{entryId} {
-      allow read: if isSignedIn() && isInFamily(resource.data.familyId);
-      allow create: if isSignedIn() && isInFamily(request.resource.data.familyId);
-      allow update, delete: if isSignedIn() && isInFamily(resource.data.familyId);
+    match /wasteEntries/{id} {
+      allow read, write: if inFamily(resource.data.familyId);
+      allow create: if isSignedIn() && callerFamilyId() == request.resource.data.familyId;
     }
   }
 }
