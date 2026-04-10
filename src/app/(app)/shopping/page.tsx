@@ -14,13 +14,9 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import { ShoppingItem, ShoppingCategory } from '@/types';
-import {
-  Sparkles,
-  ShoppingCart,
-  Check,
-  X,
-  ListFilter,
-} from 'lucide-react';
+import { Plus, Sparkles, ShoppingCart, Check, X, ListFilter } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import confetti from 'canvas-confetti';
 
 const CATEGORY_ICONS: Record<string, string> = {
   'Obst & Gemüse': '🥦',
@@ -34,8 +30,6 @@ const CATEGORY_ICONS: Record<string, string> = {
   'Drogerie': '🧴',
   'Sonstiges': '🛒',
 };
-import { motion, AnimatePresence } from 'framer-motion';
-import confetti from 'canvas-confetti';
 
 const CATEGORY_COLORS: Record<ShoppingCategory, string> = {
   'Obst & Gemüse': 'from-green-500 to-lime-500',
@@ -50,6 +44,8 @@ const CATEGORY_COLORS: Record<ShoppingCategory, string> = {
   'Sonstiges': 'from-zinc-500 to-stone-500',
 };
 
+const UNITS = ['Stk', 'g', 'kg', 'ml', 'L', 'Packung', 'Bund', 'Dose', 'Flasche', 'EL', 'TL'];
+
 export default function ShoppingPage() {
   const { profile } = useAuth();
   const { data: items, loading } = useShoppingItems();
@@ -57,6 +53,11 @@ export default function ShoppingPage() {
   const [aiLoading, setAiLoading] = useState(false);
   const [showChecked, setShowChecked] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Quantity dialog state
+  const [showQtyDialog, setShowQtyDialog] = useState(false);
+  const [manualQty, setManualQty] = useState(1);
+  const [manualUnit, setManualUnit] = useState('Stk');
 
   const grouped = useMemo(() => {
     const filtered = items.filter((i) => showChecked || !i.checked);
@@ -68,53 +69,39 @@ export default function ShoppingPage() {
     return groups;
   }, [items, showChecked]);
 
-  async function handleAdd(useAI: boolean) {
+  async function handleAddAI() {
     if (!input.trim() || !profile?.familyId) return;
     setError(null);
-
+    setAiLoading(true);
     try {
-      if (useAI) {
-        setAiLoading(true);
-        const res = await fetch('/api/ai/shopping', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ input }),
-        });
-        if (!res.ok) {
-          const e = await res.json();
-          throw new Error(e.error || 'AI-Fehler');
-        }
-        const { items: aiItems } = await res.json();
+      const res = await fetch('/api/ai/shopping', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ input }),
+      });
+      if (!res.ok) {
+        const e = await res.json();
+        throw new Error(e.error || 'AI-Fehler');
+      }
+      const { items: aiItems } = await res.json();
 
-        const batch = writeBatch(db);
-        for (const ai of aiItems) {
-          const ref = doc(collection(db, 'shoppingItems'));
-          batch.set(ref, {
-            familyId: profile.familyId,
-            name: ai.name,
-            quantity: ai.quantity || 1,
-            unit: ai.unit || 'Stk',
-            category: ai.category || 'Sonstiges',
-            checked: false,
-            addedBy: profile.id,
-            aiSuggested: true,
-            createdAt: serverTimestamp(),
-          });
-        }
-        await batch.commit();
-      } else {
-        await addDoc(collection(db, 'shoppingItems'), {
+      const batch = writeBatch(db);
+      for (const ai of aiItems) {
+        const ref = doc(collection(db, 'shoppingItems'));
+        batch.set(ref, {
           familyId: profile.familyId,
-          name: input.trim(),
-          quantity: 1,
-          unit: 'Stk',
-          category: 'Sonstiges',
+          name: ai.name,
+          quantity: ai.quantity || 1,
+          unit: ai.unit || 'Stk',
+          category: ai.category || 'Sonstiges',
+          emoji: ai.emoji || '',
           checked: false,
           addedBy: profile.id,
-          aiSuggested: false,
+          aiSuggested: true,
           createdAt: serverTimestamp(),
         });
       }
+      await batch.commit();
       setInput('');
     } catch (e: any) {
       setError(e.message);
@@ -123,18 +110,38 @@ export default function ShoppingPage() {
     }
   }
 
+  function openQtyDialog() {
+    if (!input.trim()) return;
+    setManualQty(1);
+    setManualUnit('Stk');
+    setShowQtyDialog(true);
+  }
+
+  async function confirmManualAdd() {
+    if (!input.trim() || !profile?.familyId) return;
+    await addDoc(collection(db, 'shoppingItems'), {
+      familyId: profile.familyId,
+      name: input.trim(),
+      quantity: manualQty,
+      unit: manualUnit,
+      category: 'Sonstiges',
+      emoji: '',
+      checked: false,
+      addedBy: profile.id,
+      aiSuggested: false,
+      createdAt: serverTimestamp(),
+    });
+    setInput('');
+    setShowQtyDialog(false);
+  }
+
   async function toggleItem(item: ShoppingItem) {
     const newChecked = !item.checked;
     await updateDoc(doc(db, 'shoppingItems', item.id), { checked: newChecked });
-
     if (newChecked) {
       const remaining = items.filter((i) => !i.checked && i.id !== item.id).length;
       if (remaining === 0 && items.length > 0) {
-        confetti({
-          particleCount: 100,
-          spread: 70,
-          origin: { y: 0.6 },
-        });
+        confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
       }
     }
   }
@@ -146,9 +153,7 @@ export default function ShoppingPage() {
   async function clearChecked() {
     const checkedItems = items.filter((i) => i.checked);
     const batch = writeBatch(db);
-    for (const item of checkedItems) {
-      batch.delete(doc(db, 'shoppingItems', item.id));
-    }
+    for (const item of checkedItems) batch.delete(doc(db, 'shoppingItems', item.id));
     await batch.commit();
   }
 
@@ -171,18 +176,26 @@ export default function ShoppingPage() {
         </div>
       </header>
 
-      {/* AI Input */}
+      {/* Input */}
       <div className="glass rounded-2xl p-3 shadow-widget">
         <div className="flex items-center gap-2">
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleAdd(true)}
+            onKeyDown={(e) => e.key === 'Enter' && handleAddAI()}
             placeholder="z.B. Milch, Brot und Zutaten für Pizza…"
             className="flex-1 bg-transparent px-2 py-2 outline-none"
           />
           <button
-            onClick={() => handleAdd(true)}
+            onClick={openQtyDialog}
+            disabled={!input.trim()}
+            className="p-2.5 rounded-xl hover:bg-ink-100 dark:hover:bg-ink-700 disabled:opacity-30 transition"
+            title="Manuell hinzufügen"
+          >
+            <Plus className="w-5 h-5" />
+          </button>
+          <button
+            onClick={handleAddAI}
             disabled={!input.trim() || aiLoading}
             className="p-2.5 rounded-xl bg-gradient-to-br from-violet-500 to-pink-500 text-white disabled:opacity-30 hover:scale-105 transition"
             title="Mit AI hinzufügen"
@@ -194,6 +207,54 @@ export default function ShoppingPage() {
             )}
           </button>
         </div>
+
+        {/* Quantity dialog */}
+        <AnimatePresence>
+          {showQtyDialog && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="overflow-hidden"
+            >
+              <div className="mt-3 pt-3 border-t border-ink-100 dark:border-ink-700">
+                <div className="text-sm font-medium mb-2">
+                  Wie viel von <span className="text-violet-500">"{input}"</span>?
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={0.1}
+                    step={0.1}
+                    value={manualQty}
+                    onChange={(e) => setManualQty(parseFloat(e.target.value) || 1)}
+                    className="w-20 bg-ink-100 dark:bg-ink-700 rounded-xl px-3 py-2 text-center font-bold outline-none"
+                  />
+                  <select
+                    value={manualUnit}
+                    onChange={(e) => setManualUnit(e.target.value)}
+                    className="flex-1 bg-ink-100 dark:bg-ink-700 rounded-xl px-3 py-2 outline-none text-sm"
+                  >
+                    {UNITS.map((u) => <option key={u}>{u}</option>)}
+                  </select>
+                  <button
+                    onClick={() => setShowQtyDialog(false)}
+                    className="p-2 rounded-xl hover:bg-ink-100 dark:hover:bg-ink-700 text-ink-500"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={confirmManualAdd}
+                    className="p-2 rounded-xl bg-ink-900 dark:bg-white text-white dark:text-ink-900"
+                  >
+                    <Check className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {error && <div className="text-red-500 text-xs mt-2 px-2">{error}</div>}
         <div className="text-[11px] text-ink-500 mt-2 px-2 flex items-center gap-1">
           <Sparkles className="w-3 h-3" /> AI versteht natürliche Sprache und Rezepte
@@ -210,10 +271,7 @@ export default function ShoppingPage() {
           {showChecked ? 'Erledigte ausblenden' : 'Erledigte zeigen'}
         </button>
         {checkedCount > 0 && (
-          <button
-            onClick={clearChecked}
-            className="text-red-500 hover:text-red-600 font-medium"
-          >
+          <button onClick={clearChecked} className="text-red-500 hover:text-red-600 font-medium">
             {checkedCount} erledigte löschen
           </button>
         )}
@@ -263,15 +321,11 @@ export default function ShoppingPage() {
                       >
                         {item.checked && <Check className="w-4 h-4 text-white" />}
                       </button>
-                      <div className="text-xl flex-shrink-0">
-                        {CATEGORY_ICONS[item.category] ?? '🛒'}
+                      <div className="text-xl flex-shrink-0 w-7 text-center">
+                        {item.emoji || CATEGORY_ICONS[item.category] || '🛒'}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div
-                          className={`font-medium ${
-                            item.checked ? 'line-through text-ink-500' : ''
-                          }`}
-                        >
+                        <div className={`font-medium ${item.checked ? 'line-through text-ink-500' : ''}`}>
                           {item.name}
                         </div>
                         <div className="text-xs text-ink-500">

@@ -10,10 +10,11 @@ Regeln:
 - Normalisiere Artikelnamen (z.B. "Tomate" statt "Tomaten")
 - Erkenne Mengen und Einheiten
 - Kategorisiere in: "Obst & Gemüse", "Milchprodukte", "Fleisch & Fisch", "Backwaren", "Tiefkühl", "Getränke", "Süßwaren", "Haushalt", "Drogerie", "Sonstiges"
+- Wähle für jedes Produkt das passende Emoji (z.B. 🍌 für Banane, 🥛 für Milch, 🍎 für Apfel, 🥩 für Fleisch, 🍞 für Brot)
 - Antworte NUR mit validem JSON im folgenden Format:
 {
   "items": [
-    { "name": "Milch", "quantity": 2, "unit": "Liter", "category": "Milchprodukte" }
+    { "name": "Milch", "quantity": 2, "unit": "Liter", "category": "Milchprodukte", "emoji": "🥛" }
   ]
 }`;
 

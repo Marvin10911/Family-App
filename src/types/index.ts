@@ -70,6 +70,7 @@ export interface ShoppingItem {
   quantity: number;
   unit: string;
   category: ShoppingCategory;
+  emoji?: string;
   checked: boolean;
   addedBy: string;
   aiSuggested: boolean;
