@@ -3,9 +3,12 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth/auth-context';
-import { createFamily, joinFamily } from '@/lib/family/family-service';
 import { Users, PlusCircle, LogIn, Sparkles, Home } from 'lucide-react';
 import { motion } from 'framer-motion';
+
+async function getIdToken(user: any): Promise<string> {
+  return user.getIdToken(/* forceRefresh */ true);
+}
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -22,11 +25,21 @@ export default function OnboardingPage() {
     setLoading(true);
     setError(null);
     try {
-      await createFamily(user.uid, familyName);
+      const token = await getIdToken(user);
+      const res = await fetch('/api/family/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ name: familyName }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Fehler beim Erstellen');
       await refreshProfile();
       router.push('/dashboard');
     } catch (err: any) {
-      setError(err.message || 'Fehler beim Erstellen');
+      setError(err.message);
     } finally {
       setLoading(false);
     }
@@ -38,11 +51,21 @@ export default function OnboardingPage() {
     setLoading(true);
     setError(null);
     try {
-      await joinFamily(user.uid, inviteCode);
+      const token = await getIdToken(user);
+      const res = await fetch('/api/family/join', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ inviteCode }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Ungültiger Code');
       await refreshProfile();
       router.push('/dashboard');
     } catch (err: any) {
-      setError(err.message || 'Ungültiger Code');
+      setError(err.message);
     } finally {
       setLoading(false);
     }
@@ -51,10 +74,17 @@ export default function OnboardingPage() {
   return (
     <div className="min-h-dvh relative overflow-hidden bg-cream-100 dark:bg-ink-950 flex items-center justify-center p-6">
       <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute -top-40 -left-40 w-[500px] h-[500px] rounded-full opacity-30 blur-3xl animate-float"
-          style={{ background: 'radial-gradient(circle, #8b5cf6, #ec4899, transparent)' }} />
-        <div className="absolute bottom-0 right-0 w-[500px] h-[500px] rounded-full opacity-30 blur-3xl animate-float"
-          style={{ background: 'radial-gradient(circle, #f97316, #eab308, transparent)', animationDelay: '2s' }} />
+        <div
+          className="absolute -top-40 -left-40 w-[500px] h-[500px] rounded-full opacity-30 blur-3xl animate-float"
+          style={{ background: 'radial-gradient(circle, #8b5cf6, #ec4899, transparent)' }}
+        />
+        <div
+          className="absolute bottom-0 right-0 w-[500px] h-[500px] rounded-full opacity-30 blur-3xl animate-float"
+          style={{
+            background: 'radial-gradient(circle, #f97316, #eab308, transparent)',
+            animationDelay: '2s',
+          }}
+        />
       </div>
 
       <motion.div
@@ -71,7 +101,6 @@ export default function OnboardingPage() {
             <>
               <h1 className="text-3xl font-bold mb-2">Fast geschafft!</h1>
               <p className="text-ink-500 mb-6">Erstelle eine Familie oder tritt einer bei</p>
-
               <div className="space-y-3">
                 <button
                   onClick={() => setMode('create')}
@@ -104,25 +133,30 @@ export default function OnboardingPage() {
 
           {mode === 'create' && (
             <form onSubmit={handleCreate}>
-              <button type="button" onClick={() => setMode('select')} className="text-sm text-ink-500 mb-4">
+              <button
+                type="button"
+                onClick={() => { setMode('select'); setError(null); }}
+                className="text-sm text-ink-500 mb-4"
+              >
                 ← Zurück
               </button>
               <h1 className="text-3xl font-bold mb-2">Familie erstellen</h1>
               <p className="text-ink-500 mb-6">Wie heißt eure Familie?</p>
-
               <div className="relative mb-4">
                 <Home className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-ink-500" />
                 <input
                   required
-                  placeholder="z.B. Familie Mustermann"
+                  placeholder="z.B. Familie Wieland"
                   value={familyName}
                   onChange={(e) => setFamilyName(e.target.value)}
                   className="input pl-12"
                 />
               </div>
-
-              {error && <div className="text-red-500 text-sm mb-4">{error}</div>}
-
+              {error && (
+                <div className="text-red-500 text-sm bg-red-50 dark:bg-red-950/30 px-4 py-3 rounded-xl mb-4">
+                  {error}
+                </div>
+              )}
               <button type="submit" disabled={loading} className="btn-primary w-full py-3.5">
                 {loading ? 'Erstelle…' : 'Familie erstellen'}
               </button>
@@ -131,12 +165,15 @@ export default function OnboardingPage() {
 
           {mode === 'join' && (
             <form onSubmit={handleJoin}>
-              <button type="button" onClick={() => setMode('select')} className="text-sm text-ink-500 mb-4">
+              <button
+                type="button"
+                onClick={() => { setMode('select'); setError(null); }}
+                className="text-sm text-ink-500 mb-4"
+              >
                 ← Zurück
               </button>
               <h1 className="text-3xl font-bold mb-2">Beitreten</h1>
               <p className="text-ink-500 mb-6">Gib den 6-stelligen Einladungscode ein</p>
-
               <div className="relative mb-4">
                 <Users className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-ink-500" />
                 <input
@@ -148,9 +185,11 @@ export default function OnboardingPage() {
                   className="input pl-12 uppercase tracking-widest text-center font-mono text-xl"
                 />
               </div>
-
-              {error && <div className="text-red-500 text-sm mb-4">{error}</div>}
-
+              {error && (
+                <div className="text-red-500 text-sm bg-red-50 dark:bg-red-950/30 px-4 py-3 rounded-xl mb-4">
+                  {error}
+                </div>
+              )}
               <button type="submit" disabled={loading} className="btn-primary w-full py-3.5">
                 {loading ? 'Beitreten…' : 'Beitreten'}
               </button>
