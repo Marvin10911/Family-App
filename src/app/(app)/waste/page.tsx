@@ -23,9 +23,10 @@ import Link from 'next/link';
 const WASTE_TYPES: WasteType[] = ['Restmüll', 'Biotonne', 'Gelbe Tonne', 'Altpapier', 'Sperrmüll', 'Glas'];
 
 const SOURCE_BADGES: Record<string, { label: string; color: string; icon: any }> = {
-  awido: { label: 'Echte Daten', color: 'text-green-600 bg-green-50 dark:bg-green-950/30', icon: Wifi },
-  ical:  { label: 'iCal-Kalender', color: 'text-blue-600 bg-blue-50 dark:bg-blue-950/30', icon: Calendar },
-  ai:    { label: 'KI-Schätzung', color: 'text-amber-600 bg-amber-50 dark:bg-amber-950/30', icon: Bot },
+  abfallplus: { label: 'Echte Daten', color: 'text-green-600 bg-green-50 dark:bg-green-950/30', icon: Wifi },
+  awido:      { label: 'Echte Daten', color: 'text-green-600 bg-green-50 dark:bg-green-950/30', icon: Wifi },
+  ical:       { label: 'iCal-Kalender', color: 'text-blue-600 bg-blue-50 dark:bg-blue-950/30', icon: Calendar },
+  ai:         { label: 'KI-Schätzung', color: 'text-amber-600 bg-amber-50 dark:bg-amber-950/30', icon: Bot },
 };
 
 export default function WastePage() {
