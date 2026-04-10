@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth/auth-context';
-import { getFamilyMembers, removeFamilyMember } from '@/lib/family/family-service';
+import { getFamilyMembers, removeFamilyMember, deleteFamily } from '@/lib/family/family-service';
 import { UserProfile } from '@/types';
-import { Users, Crown, Copy, Check, Trophy, UserMinus, LogOut, AlertTriangle } from 'lucide-react';
+import { Users, Crown, Copy, Check, Trophy, UserMinus, LogOut, AlertTriangle, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 
@@ -15,6 +15,7 @@ export default function FamilyPage() {
   const [copied, setCopied] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -57,6 +58,19 @@ export default function FamilyPage() {
     } finally {
       setLoading(false);
       setConfirmRemove(null);
+    }
+  }
+
+  async function handleDeleteFamily() {
+    if (!family?.id) return;
+    setLoading(true);
+    try {
+      await deleteFamily(family.id, family.members);
+      await refreshFamily();
+      router.replace('/onboarding');
+    } finally {
+      setLoading(false);
+      setConfirmDelete(false);
     }
   }
 
@@ -177,6 +191,16 @@ export default function FamilyPage() {
         </button>
       )}
 
+      {/* Delete family (owner only) */}
+      {isOwner && (
+        <button
+          onClick={() => setConfirmDelete(true)}
+          className="w-full py-3 rounded-2xl border border-red-200 dark:border-red-900 text-red-500 font-semibold flex items-center justify-center gap-2 hover:bg-red-50 dark:hover:bg-red-950/30 transition"
+        >
+          <Trash2 className="w-4 h-4" /> Familie löschen
+        </button>
+      )}
+
       {/* Confirm: Leave */}
       <AnimatePresence>
         {confirmLeave && (
@@ -264,6 +288,59 @@ export default function FamilyPage() {
                   className="flex-1 py-3 rounded-2xl bg-red-500 text-white font-semibold text-sm disabled:opacity-50"
                 >
                   {loading ? 'Moment…' : 'Entfernen'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Confirm: Delete family */}
+      <AnimatePresence>
+        {confirmDelete && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm p-4"
+            onClick={() => setConfirmDelete(false)}
+          >
+            <motion.div
+              initial={{ y: 60, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 60, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-sm bg-white dark:bg-ink-900 rounded-3xl p-6 space-y-4 shadow-2xl"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-red-100 dark:bg-red-950/40 flex items-center justify-center">
+                  <Trash2 className="w-6 h-6 text-red-500" />
+                </div>
+                <div>
+                  <div className="font-bold text-lg">Familie löschen?</div>
+                  <div className="text-sm text-ink-500">
+                    Alle Daten werden unwiderruflich gelöscht.
+                  </div>
+                </div>
+              </div>
+              <div className="bg-red-50 dark:bg-red-950/20 rounded-2xl px-4 py-3 text-xs text-red-600 dark:text-red-400 space-y-1">
+                <div className="font-semibold">Folgendes wird gelöscht:</div>
+                <div>Einkaufsliste · Aufgaben · Essensplan · Kalender · Müllplan · Rezepte</div>
+                <div>Alle {family.members.length} Mitglieder werden aus der Familie entfernt.</div>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setConfirmDelete(false)}
+                  className="flex-1 py-3 rounded-2xl bg-ink-100 dark:bg-ink-800 font-semibold text-sm"
+                >
+                  Abbrechen
+                </button>
+                <button
+                  onClick={handleDeleteFamily}
+                  disabled={loading}
+                  className="flex-1 py-3 rounded-2xl bg-red-500 text-white font-semibold text-sm disabled:opacity-50"
+                >
+                  {loading ? 'Löschen…' : 'Endgültig löschen'}
                 </button>
               </div>
             </motion.div>
