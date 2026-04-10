@@ -13,6 +13,8 @@ import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  sendEmailVerification,
+  sendPasswordResetEmail,
   signOut as fbSignOut,
   updateProfile,
   User as FbUser,
@@ -37,6 +39,7 @@ interface AuthContextValue {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, displayName: string) => Promise<void>;
   signOut: () => Promise<void>;
+  sendPasswordReset: (email: string) => Promise<void>;
   refreshProfile: () => Promise<void>;
   refreshFamily: () => Promise<void>;
 }
@@ -131,8 +134,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signIn = useCallback(async (email: string, password: string) => {
-    await signInWithEmailAndPassword(auth, email, password);
-    // loading will be set to false by the onSnapshot callback above
+    const cred = await signInWithEmailAndPassword(auth, email, password);
+    if (!cred.user.emailVerified) {
+      // Send a fresh verification email, then force sign-out
+      await sendEmailVerification(cred.user).catch(() => {});
+      await fbSignOut(auth);
+      throw Object.assign(new Error('E-Mail nicht bestätigt.'), {
+        code: 'auth/email-not-verified',
+      });
+    }
   }, []);
 
   const signUp = useCallback(
@@ -151,10 +161,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         createdAt: serverTimestamp(),
         lastSeen: serverTimestamp(),
       });
-      // The onSnapshot listener will pick up the new doc and set loading=false
+
+      // Send verification email, then sign out until verified
+      await sendEmailVerification(cred.user);
+      await fbSignOut(auth);
     },
     []
   );
+
+  const sendPasswordReset = useCallback(async (email: string) => {
+    await sendPasswordResetEmail(auth, email);
+  }, []);
 
   const signOut = useCallback(async () => {
     await fbSignOut(auth);
@@ -180,7 +197,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, profile, family, loading, signIn, signUp, signOut, refreshProfile, refreshFamily }}
+      value={{ user, profile, family, loading, signIn, signUp, signOut, sendPasswordReset, refreshProfile, refreshFamily }}
     >
       {children}
     </AuthContext.Provider>
