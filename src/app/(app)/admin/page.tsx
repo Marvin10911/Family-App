@@ -34,12 +34,13 @@ type Tab = 'users' | 'location' | 'notifications' | 'appearance' | 'account';
 
 export default function AdminPage() {
   const router = useRouter();
-  const { profile, family, signOut, refreshProfile } = useAuth();
+  const { profile, family, signOut, refreshProfile, refreshFamily } = useAuth();
   const [tab, setTab] = useState<Tab>('users');
   const [members, setMembers] = useState<UserProfile[]>([]);
   const [city, setCity] = useState('');
   const [zipCode, setZipCode] = useState('');
   const [state, setState] = useState('');
+  const [icalUrl, setIcalUrl] = useState('');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark' | 'auto'>('auto');
@@ -53,6 +54,7 @@ export default function AdminPage() {
       setZipCode(family.settings.wasteLocation.zipCode);
       setState(family.settings.wasteLocation.state);
     }
+    setIcalUrl((family?.settings as any)?.wasteIcalUrl || '');
     setTheme((family?.settings.theme as any) || 'auto');
   }, [family]);
 
@@ -61,7 +63,9 @@ export default function AdminPage() {
     setSaving(true);
     await updateFamilySettings(family.id, {
       wasteLocation: { city, zipCode, state, country: 'DE' },
-    });
+      wasteIcalUrl: icalUrl.trim(),
+    } as any);
+    await refreshFamily();
     setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -70,7 +74,7 @@ export default function AdminPage() {
   async function regenCode() {
     if (!family) return;
     await regenerateInviteCode(family.id);
-    await refreshProfile();
+    await refreshFamily();
   }
 
   async function saveTheme(t: 'light' | 'dark' | 'auto') {
@@ -215,21 +219,32 @@ export default function AdminPage() {
             <input
               value={city}
               onChange={(e) => setCity(e.target.value)}
-              placeholder="Ort"
+              placeholder="Ort (z.B. München)"
               className="input"
             />
             <input
               value={zipCode}
               onChange={(e) => setZipCode(e.target.value)}
-              placeholder="PLZ"
+              placeholder="PLZ (z.B. 80331)"
               className="input"
             />
             <input
               value={state}
               onChange={(e) => setState(e.target.value)}
-              placeholder="Bundesland"
+              placeholder="Bundesland (z.B. Bayern)"
               className="input"
             />
+            <div>
+              <div className="text-xs text-ink-500 mb-1.5">
+                iCal-URL (optional) — für 100% genaue Daten von deiner Stadtwebseite
+              </div>
+              <input
+                value={icalUrl}
+                onChange={(e) => setIcalUrl(e.target.value)}
+                placeholder="https://www.deine-stadt.de/abfall.ics"
+                className="input text-xs"
+              />
+            </div>
             <button
               onClick={saveLocation}
               disabled={saving}

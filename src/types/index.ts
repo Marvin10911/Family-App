@@ -70,6 +70,7 @@ export interface ShoppingItem {
   quantity: number;
   unit: string;
   category: ShoppingCategory;
+  emoji?: string;
   checked: boolean;
   addedBy: string;
   aiSuggested: boolean;
@@ -197,6 +198,37 @@ export const DEFAULT_PERMISSIONS: Record<UserRole, UserPermissions> = {
     canViewAdmin: false,
   },
 };
+
+export type RecipeCategory =
+  | 'Frühstück'
+  | 'Mittagessen'
+  | 'Abendessen'
+  | 'Dessert'
+  | 'Snack'
+  | 'Sonstiges';
+
+export interface RecipeIngredient {
+  name: string;
+  amount: string;
+  emoji?: string;
+}
+
+export interface Recipe {
+  id: string;
+  familyId: string;
+  name: string;
+  emoji: string;
+  category: RecipeCategory;
+  duration: number; // minutes
+  servings: number;
+  ingredients: RecipeIngredient[];
+  steps: string[];
+  notes?: string;
+  favorite: boolean;
+  aiGenerated: boolean;
+  createdBy: string;
+  createdAt: Timestamp | Date;
+}
 
 export const WASTE_COLORS: Record<WasteType, string> = {
   Restmüll: '#6b7280',

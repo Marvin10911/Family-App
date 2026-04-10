@@ -7,15 +7,17 @@ import {
   ShoppingCart,
   CheckSquare,
   UtensilsCrossed,
+  BookOpen,
   Calendar,
   Settings,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const items = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/dashboard', label: 'Start', icon: LayoutDashboard },
   { href: '/shopping', label: 'Einkauf', icon: ShoppingCart },
   { href: '/tasks', label: 'Aufgaben', icon: CheckSquare },
+  { href: '/recipes', label: 'Rezepte', icon: BookOpen },
   { href: '/meals', label: 'Essen', icon: UtensilsCrossed },
   { href: '/calendar', label: 'Kalender', icon: Calendar },
   { href: '/admin', label: 'Einstell.', icon: Settings },
