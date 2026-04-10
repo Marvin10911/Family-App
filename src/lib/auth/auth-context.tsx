@@ -18,8 +18,7 @@ import {
   signOut as fbSignOut,
   updateProfile,
   User as FbUser,
-} from 'firebase/auth';
-import {
+} from 'firebase/auth';import {
   doc,
   getDoc,
   setDoc,
@@ -68,14 +67,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         profileUnsubRef.current = null;
       }
 
-      setUser(fbUser);
-
       if (!fbUser) {
+        setUser(null);
         setProfile(null);
         setFamily(null);
         setLoading(false);
         return;
       }
+
+      // Block unverified users — treat them as not logged in
+      if (!fbUser.emailVerified) {
+        setUser(null);
+        setProfile(null);
+        setFamily(null);
+        setLoading(false);
+        return;
+      }
+
+      setUser(fbUser);
 
       // Subscribe to the user's profile document
       const userRef = doc(db, 'users', fbUser.uid);
@@ -162,8 +171,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         lastSeen: serverTimestamp(),
       });
 
-      // Send verification email, then sign out until verified
-      await sendEmailVerification(cred.user);
+      // Try custom email via Resend; fall back to Firebase built-in
+      try {
+        const res = await fetch('/api/auth/send-verification', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ uid: cred.user.uid, email, displayName }),
+        });
+        const data = await res.json();
+        // If Resend not configured, Firebase fallback
+        if (data.method === 'firebase-fallback') {
+          await sendEmailVerification(cred.user);
+        }
+      } catch {
+        // Last resort fallback
+        await sendEmailVerification(cred.user).catch(() => {});
+      }
+
       await fbSignOut(auth);
     },
     []

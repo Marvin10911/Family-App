@@ -2,21 +2,24 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth/auth-context';
-import { Sparkles, Mail, Lock, ArrowRight, MailCheck, KeyRound, ArrowLeft } from 'lucide-react';
+import { Sparkles, Mail, Lock, ArrowRight, MailCheck, KeyRound, ArrowLeft, CheckCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Suspense } from 'react';
 
 type View = 'login' | 'reset' | 'reset-done' | 'unverified';
 
-export default function LoginPage() {
+function LoginPageInner() {
   const router = useRouter();
+  const params = useSearchParams();
   const { signIn, sendPasswordReset, user, profile, loading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<View>('login');
+  const justVerified = params.get('verified') === 'true';
 
   useEffect(() => {
     if (!loading && user && profile?.familyId) router.replace('/dashboard');
@@ -91,6 +94,13 @@ export default function LoginPage() {
 
             <h1 className="text-3xl font-bold mb-2">Willkommen zurück</h1>
             <p className="text-ink-500 dark:text-ink-100 mb-6">Melde dich bei eurer Familie an</p>
+
+            {justVerified && (
+              <div className="flex items-center gap-2 bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400 px-4 py-3 rounded-xl text-sm font-medium mb-4">
+                <CheckCircle className="w-4 h-4 flex-shrink-0" />
+                E-Mail erfolgreich bestätigt! Du kannst dich jetzt anmelden.
+              </div>
+            )}
 
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="relative">
@@ -272,5 +282,13 @@ export default function LoginPage() {
 
       </AnimatePresence>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginPageInner />
+    </Suspense>
   );
 }
