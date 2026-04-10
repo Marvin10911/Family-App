@@ -7,6 +7,7 @@ import {
   collection,
   doc,
   setDoc,
+  updateDoc,
   getDocs,
   query,
   where,
