@@ -25,6 +25,7 @@ import {
 import { formatDateDE, getTimeGreeting, getTimeEmoji } from '@/lib/utils';
 import { WasteWidgetContent } from '@/components/dashboard/waste-widget-content';
 import { WeatherWidgetContent } from '@/components/dashboard/weather-widget-content';
+import { AnimatedNumber } from '@/components/ui/animated-number';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 
@@ -58,31 +59,60 @@ export default function DashboardPage() {
   return (
     <div className="space-y-5">
       {/* Header */}
-      <motion.header
-        initial={{ opacity: 0, y: -12 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex items-start justify-between pt-2"
-      >
+      <header className="flex items-start justify-between pt-2">
         <div>
-          <div className="text-sm text-ink-500 mb-1">{formatDateDE(new Date())}</div>
-          <h1 className="text-3xl font-bold tracking-tight leading-tight">
-            {getTimeGreeting()},<br />
-            {firstName} <span className="inline-block">{getTimeEmoji()}</span>
-          </h1>
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4 }}
+            className="text-sm text-ink-500 mb-1"
+          >
+            {formatDateDE(new Date())}
+          </motion.div>
+          <div className="text-3xl font-bold tracking-tight leading-tight overflow-hidden">
+            <motion.div
+              initial={{ y: 40, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+            >
+              {getTimeGreeting()},
+            </motion.div>
+            <motion.div
+              initial={{ y: 40, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ duration: 0.5, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
+            >
+              {firstName}{' '}
+              <motion.span
+                initial={{ scale: 0, rotate: -20 }}
+                animate={{ scale: 1, rotate: 0 }}
+                transition={{ delay: 0.3, type: 'spring', stiffness: 300, damping: 12 }}
+                className="inline-block"
+              >
+                {getTimeEmoji()}
+              </motion.span>
+            </motion.div>
+          </div>
         </div>
 
         {family && (
-          <Link
-            href="/family"
-            className="rounded-xl px-3 py-2 bg-white dark:bg-ink-900 border border-ink-100 dark:border-ink-700 text-right shadow-sm"
+          <motion.div
+            initial={{ opacity: 0, x: 16, scale: 0.92 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            transition={{ delay: 0.15, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
           >
-            <div className="text-[11px] text-ink-500">Familie</div>
-            <div className="font-semibold text-sm text-violet-600 dark:text-violet-400">
-              {family.name}
-            </div>
-          </Link>
+            <Link
+              href="/family"
+              className="rounded-xl px-3 py-2 bg-white dark:bg-ink-900 border border-ink-100 dark:border-ink-700 text-right shadow-sm block"
+            >
+              <div className="text-[11px] text-ink-500">Familie</div>
+              <div className="font-semibold text-sm text-violet-600 dark:text-violet-400">
+                {family.name}
+              </div>
+            </Link>
+          </motion.div>
         )}
-      </motion.header>
+      </header>
 
       {/* Widget Grid */}
       <div className="grid grid-cols-2 gap-4">
@@ -94,7 +124,7 @@ export default function DashboardPage() {
           delay={0}
         >
           <div className="space-y-1">
-            <div className="text-4xl font-bold">{openShopping.length}</div>
+            <AnimatedNumber value={openShopping.length} className="text-4xl font-bold" delay={0.1} />
             <div className="text-sm opacity-90">
               {openShopping.length === 1 ? 'offener Eintrag' : 'offene Einträge'}
             </div>
@@ -114,7 +144,7 @@ export default function DashboardPage() {
           delay={0.05}
         >
           <div className="space-y-1">
-            <div className="text-4xl font-bold">{openTasks.length}</div>
+            <AnimatedNumber value={openTasks.length} className="text-4xl font-bold" delay={0.15} />
             <div className="text-sm opacity-90">
               {openTasks.length === 0
                 ? 'Alles erledigt!'
@@ -205,7 +235,7 @@ export default function DashboardPage() {
           delay={0.3}
         >
           <div className="space-y-1">
-            <div className="text-4xl font-bold">{recipes.length}</div>
+            <AnimatedNumber value={recipes.length} className="text-4xl font-bold" delay={0.35} />
             <div className="text-sm opacity-90">
               {recipes.length === 1 ? 'Rezept' : 'Rezepte'}
             </div>
