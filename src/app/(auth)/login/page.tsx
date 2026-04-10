@@ -58,7 +58,16 @@ function LoginPageInner() {
     setSubmitting(true);
     setError(null);
     try {
-      await sendPasswordReset(email);
+      // Try via Resend first (nicer email, no spam), fallback to Firebase
+      const res = await fetch('/api/auth/send-password-reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      if (data.method === 'firebase-fallback') {
+        await sendPasswordReset(email);
+      }
       setView('reset-done');
     } catch (err: any) {
       const code: string = err?.code ?? '';
@@ -271,12 +280,12 @@ function LoginPageInner() {
               </p>
             </div>
 
-            <Link
-              href="/login"
+            <button
+              onClick={() => { setView('login'); setError(null); }}
               className="btn-primary w-full py-3.5 flex items-center justify-center gap-2"
             >
               Zur Anmeldung <ArrowRight className="w-4 h-4" />
-            </Link>
+            </button>
           </motion.div>
         )}
 
