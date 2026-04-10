@@ -15,7 +15,13 @@ function getAdminApp(): App {
 
   const projectId = process.env.FIREBASE_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+
+  // Vercel kann den Key mit echten Zeilenumbrüchen ODER mit literal \n speichern
+  // Wir normalisieren beide Varianten
+  const rawKey = process.env.FIREBASE_PRIVATE_KEY ?? '';
+  const privateKey = rawKey.includes('\\n')
+    ? rawKey.replace(/\\n/g, '\n')
+    : rawKey;
 
   if (!projectId || !clientEmail || !privateKey) {
     throw new Error(
