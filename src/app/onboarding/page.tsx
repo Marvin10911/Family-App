@@ -3,12 +3,22 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth/auth-context';
+import {
+  collection,
+  doc,
+  setDoc,
+  updateDoc,
+  getDocs,
+  query,
+  where,
+  arrayUnion,
+  serverTimestamp,
+} from 'firebase/firestore';
+import { db } from '@/lib/firebase/client';
+import { generateInviteCode, generateAvatarColor } from '@/lib/utils';
+import { DEFAULT_PERMISSIONS } from '@/types';
 import { Users, PlusCircle, LogIn, Sparkles, Home } from 'lucide-react';
 import { motion } from 'framer-motion';
-
-async function getIdToken(user: any): Promise<string> {
-  return user.getIdToken(/* forceRefresh */ true);
-}
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -25,21 +35,28 @@ export default function OnboardingPage() {
     setLoading(true);
     setError(null);
     try {
-      const token = await getIdToken(user);
-      const res = await fetch('/api/family/create', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ name: familyName }),
+      const familyRef = doc(collection(db, 'families'));
+      const code = generateInviteCode();
+
+      await setDoc(familyRef, {
+        name: familyName.trim(),
+        inviteCode: code,
+        ownerId: user.uid,
+        members: [user.uid],
+        settings: { theme: 'auto', language: 'de' },
+        createdAt: serverTimestamp(),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Fehler beim Erstellen');
+
+      await updateDoc(doc(db, 'users', user.uid), {
+        familyId: familyRef.id,
+        role: 'owner',
+        permissions: DEFAULT_PERMISSIONS.owner,
+      });
+
       await refreshProfile();
       router.push('/dashboard');
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || 'Fehler beim Erstellen');
     } finally {
       setLoading(false);
     }
@@ -51,21 +68,34 @@ export default function OnboardingPage() {
     setLoading(true);
     setError(null);
     try {
-      const token = await getIdToken(user);
-      const res = await fetch('/api/family/join', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ inviteCode }),
+      const snap = await getDocs(
+        query(
+          collection(db, 'families'),
+          where('inviteCode', '==', inviteCode.trim().toUpperCase())
+        )
+      );
+
+      if (snap.empty) {
+        setError('Ungültiger Einladungscode');
+        return;
+      }
+
+      const familyDoc = snap.docs[0];
+
+      await updateDoc(doc(db, 'families', familyDoc.id), {
+        members: arrayUnion(user.uid),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Ungültiger Code');
+
+      await updateDoc(doc(db, 'users', user.uid), {
+        familyId: familyDoc.id,
+        role: 'adult',
+        permissions: DEFAULT_PERMISSIONS.adult,
+      });
+
       await refreshProfile();
       router.push('/dashboard');
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || 'Fehler beim Beitreten');
     } finally {
       setLoading(false);
     }
@@ -80,10 +110,7 @@ export default function OnboardingPage() {
         />
         <div
           className="absolute bottom-0 right-0 w-[500px] h-[500px] rounded-full opacity-30 blur-3xl animate-float"
-          style={{
-            background: 'radial-gradient(circle, #f97316, #eab308, transparent)',
-            animationDelay: '2s',
-          }}
+          style={{ background: 'radial-gradient(circle, #f97316, #eab308, transparent)', animationDelay: '2s' }}
         />
       </div>
 
@@ -133,11 +160,7 @@ export default function OnboardingPage() {
 
           {mode === 'create' && (
             <form onSubmit={handleCreate}>
-              <button
-                type="button"
-                onClick={() => { setMode('select'); setError(null); }}
-                className="text-sm text-ink-500 mb-4"
-              >
+              <button type="button" onClick={() => { setMode('select'); setError(null); }} className="text-sm text-ink-500 mb-4">
                 ← Zurück
               </button>
               <h1 className="text-3xl font-bold mb-2">Familie erstellen</h1>
@@ -165,11 +188,7 @@ export default function OnboardingPage() {
 
           {mode === 'join' && (
             <form onSubmit={handleJoin}>
-              <button
-                type="button"
-                onClick={() => { setMode('select'); setError(null); }}
-                className="text-sm text-ink-500 mb-4"
-              >
+              <button type="button" onClick={() => { setMode('select'); setError(null); }} className="text-sm text-ink-500 mb-4">
                 ← Zurück
               </button>
               <h1 className="text-3xl font-bold mb-2">Beitreten</h1>
