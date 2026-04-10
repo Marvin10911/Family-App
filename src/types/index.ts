@@ -199,6 +199,37 @@ export const DEFAULT_PERMISSIONS: Record<UserRole, UserPermissions> = {
   },
 };
 
+export type RecipeCategory =
+  | 'Frühstück'
+  | 'Mittagessen'
+  | 'Abendessen'
+  | 'Dessert'
+  | 'Snack'
+  | 'Sonstiges';
+
+export interface RecipeIngredient {
+  name: string;
+  amount: string;
+  emoji?: string;
+}
+
+export interface Recipe {
+  id: string;
+  familyId: string;
+  name: string;
+  emoji: string;
+  category: RecipeCategory;
+  duration: number; // minutes
+  servings: number;
+  ingredients: RecipeIngredient[];
+  steps: string[];
+  notes?: string;
+  favorite: boolean;
+  aiGenerated: boolean;
+  createdBy: string;
+  createdAt: Timestamp | Date;
+}
+
 export const WASTE_COLORS: Record<WasteType, string> = {
   Restmüll: '#6b7280',
   Biotonne: '#65a30d',

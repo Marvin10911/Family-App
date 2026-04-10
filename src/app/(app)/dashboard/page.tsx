@@ -8,6 +8,7 @@ import {
   useMealPlans,
   useCalendarEvents,
   useWasteEntries,
+  useRecipes,
 } from '@/hooks/use-family-data';
 import { useWeather } from '@/hooks/use-weather';
 import {
@@ -19,6 +20,7 @@ import {
   Calendar as CalendarIcon,
   Users,
   Sparkles,
+  BookOpen,
 } from 'lucide-react';
 import { formatDateDE, getTimeGreeting, getTimeEmoji } from '@/lib/utils';
 import { WasteWidgetContent } from '@/components/dashboard/waste-widget-content';
@@ -33,6 +35,7 @@ export default function DashboardPage() {
   const { data: meals } = useMealPlans();
   const { data: events } = useCalendarEvents();
   const { data: waste } = useWasteEntries();
+  const { data: recipes } = useRecipes();
   const weather = useWeather();
 
   const openShopping = shopping.filter((i) => !i.checked);
@@ -195,11 +198,36 @@ export default function DashboardPage() {
         </Widget>
 
         <Widget
+          href="/recipes"
+          icon={BookOpen}
+          title="Rezeptbuch"
+          gradient="linear-gradient(135deg, #f43f5e 0%, #f97316 50%, #fb923c 100%)"
+          delay={0.3}
+        >
+          <div className="space-y-1">
+            <div className="text-4xl font-bold">{recipes.length}</div>
+            <div className="text-sm opacity-90">
+              {recipes.length === 1 ? 'Rezept' : 'Rezepte'}
+            </div>
+            {recipes.filter((r) => r.favorite).length > 0 && (
+              <div className="mt-2 inline-flex items-center rounded-lg bg-white/25 px-2 py-1 text-xs font-medium backdrop-blur">
+                ❤️ {recipes.filter((r) => r.favorite).length} Favoriten
+              </div>
+            )}
+            {recipes.length === 0 && (
+              <div className="mt-2 inline-flex items-center rounded-lg bg-white/25 px-2 py-1 text-xs font-medium backdrop-blur">
+                <Sparkles className="w-3 h-3 mr-1" /> AI hinzufügen
+              </div>
+            )}
+          </div>
+        </Widget>
+
+        <Widget
           href="/family"
           icon={Users}
           title="Familie"
           gradient="linear-gradient(135deg, #ec4899 0%, #f43f5e 50%, #fb7185 100%)"
-          delay={0.3}
+          delay={0.35}
           size="wide"
         >
           <div className="flex items-center gap-3 mt-1">

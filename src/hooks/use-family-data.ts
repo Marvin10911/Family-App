@@ -17,6 +17,7 @@ import {
   MealPlan,
   CalendarEvent,
   WasteEntry,
+  Recipe,
 } from '@/types';
 
 function useFamilyCollection<T>(
@@ -74,4 +75,8 @@ export function useCalendarEvents() {
 
 export function useWasteEntries() {
   return useFamilyCollection<WasteEntry>('wasteEntries');
+}
+
+export function useRecipes() {
+  return useFamilyCollection<Recipe>('recipes');
 }
