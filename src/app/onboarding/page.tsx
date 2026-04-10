@@ -7,7 +7,6 @@ import {
   collection,
   doc,
   setDoc,
-  updateDoc,
   getDocs,
   query,
   where,
@@ -47,11 +46,16 @@ export default function OnboardingPage() {
         createdAt: serverTimestamp(),
       });
 
-      await updateDoc(doc(db, 'users', user.uid), {
+      await setDoc(doc(db, 'users', user.uid), {
+        email: user.email ?? '',
+        displayName: user.displayName ?? '',
+        avatarColor: generateAvatarColor(user.email ?? ''),
+        points: 0,
+        createdAt: serverTimestamp(),
         familyId: familyRef.id,
         role: 'owner',
         permissions: DEFAULT_PERMISSIONS.owner,
-      });
+      }, { merge: true });
 
       await refreshProfile();
       router.push('/dashboard');
@@ -86,11 +90,16 @@ export default function OnboardingPage() {
         members: arrayUnion(user.uid),
       });
 
-      await updateDoc(doc(db, 'users', user.uid), {
+      await setDoc(doc(db, 'users', user.uid), {
+        email: user.email ?? '',
+        displayName: user.displayName ?? '',
+        avatarColor: generateAvatarColor(user.email ?? ''),
+        points: 0,
+        createdAt: serverTimestamp(),
         familyId: familyDoc.id,
         role: 'adult',
         permissions: DEFAULT_PERMISSIONS.adult,
-      });
+      }, { merge: true });
 
       await refreshProfile();
       router.push('/dashboard');
