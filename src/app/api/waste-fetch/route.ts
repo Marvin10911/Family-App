@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { getOpenAI, MODEL_SMART } from '@/lib/openai/client';
 import { fetchAbfallplus } from '@/lib/waste/abfallplus';
