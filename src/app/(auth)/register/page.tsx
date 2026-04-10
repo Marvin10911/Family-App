@@ -21,15 +21,23 @@ export default function RegisterPage() {
     setError(null);
     try {
       await signUp(email, password, name);
+      // signUp writes the Firestore profile doc — navigate after it completes
       router.push('/onboarding');
     } catch (err: any) {
-      setError(
-        err.code === 'auth/email-already-in-use'
-          ? 'E-Mail bereits registriert'
-          : err.code === 'auth/weak-password'
-          ? 'Passwort zu schwach (min. 6 Zeichen)'
-          : 'Registrierung fehlgeschlagen'
-      );
+      // Map Firebase error codes to German messages
+      const code: string = err?.code ?? '';
+      if (code === 'auth/email-already-in-use') {
+        setError('Diese E-Mail ist bereits registriert. Bitte anmelden.');
+      } else if (code === 'auth/weak-password') {
+        setError('Passwort zu kurz (mindestens 6 Zeichen).');
+      } else if (code === 'auth/invalid-email') {
+        setError('Ungültige E-Mail-Adresse.');
+      } else if (code === 'auth/network-request-failed') {
+        setError('Keine Internetverbindung.');
+      } else {
+        // Surface the raw message in dev so we can diagnose
+        setError(`Fehler: ${err?.message ?? 'Unbekannter Fehler'}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -97,7 +105,7 @@ export default function RegisterPage() {
             className="btn-primary w-full py-3.5"
           >
             {loading ? 'Registrieren…' : 'Account erstellen'}
-            <ArrowRight className="w-4 h-4" />
+            {!loading && <ArrowRight className="w-4 h-4" />}
           </button>
         </form>
 
