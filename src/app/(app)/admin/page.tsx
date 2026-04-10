@@ -34,7 +34,7 @@ type Tab = 'users' | 'location' | 'notifications' | 'appearance' | 'account';
 
 export default function AdminPage() {
   const router = useRouter();
-  const { profile, family, signOut, refreshProfile } = useAuth();
+  const { profile, family, signOut, refreshProfile, refreshFamily } = useAuth();
   const [tab, setTab] = useState<Tab>('users');
   const [members, setMembers] = useState<UserProfile[]>([]);
   const [city, setCity] = useState('');
@@ -62,6 +62,7 @@ export default function AdminPage() {
     await updateFamilySettings(family.id, {
       wasteLocation: { city, zipCode, state, country: 'DE' },
     });
+    await refreshFamily();
     setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -70,7 +71,7 @@ export default function AdminPage() {
   async function regenCode() {
     if (!family) return;
     await regenerateInviteCode(family.id);
-    await refreshProfile();
+    await refreshFamily();
   }
 
   async function saveTheme(t: 'light' | 'dark' | 'auto') {

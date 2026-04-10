@@ -38,6 +38,7 @@ interface AuthContextValue {
   signUp: (email: string, password: string, displayName: string) => Promise<void>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  refreshFamily: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -167,9 +168,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [user]);
 
+  const refreshFamily = useCallback(async () => {
+    if (!user) return;
+    const userSnap = await getDoc(doc(db, 'users', user.uid));
+    if (!userSnap.exists()) return;
+    const familyId = userSnap.data().familyId;
+    if (!familyId) return;
+    const famSnap = await getDoc(doc(db, 'families', familyId));
+    setFamily(famSnap.exists() ? ({ id: famSnap.id, ...famSnap.data() } as Family) : null);
+  }, [user]);
+
   return (
     <AuthContext.Provider
-      value={{ user, profile, family, loading, signIn, signUp, signOut, refreshProfile }}
+      value={{ user, profile, family, loading, signIn, signUp, signOut, refreshProfile, refreshFamily }}
     >
       {children}
     </AuthContext.Provider>

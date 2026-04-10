@@ -15,15 +15,25 @@ import {
 import { db } from '@/lib/firebase/client';
 import { ShoppingItem, ShoppingCategory } from '@/types';
 import {
-  Plus,
   Sparkles,
-  Trash2,
-  Mic,
   ShoppingCart,
   Check,
   X,
   ListFilter,
 } from 'lucide-react';
+
+const CATEGORY_ICONS: Record<string, string> = {
+  'Obst & Gemüse': '🥦',
+  'Milchprodukte': '🥛',
+  'Fleisch & Fisch': '🥩',
+  'Backwaren': '🍞',
+  'Tiefkühl': '❄️',
+  'Getränke': '🥤',
+  'Süßwaren': '🍬',
+  'Haushalt': '🧹',
+  'Drogerie': '🧴',
+  'Sonstiges': '🛒',
+};
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
 
@@ -172,14 +182,6 @@ export default function ShoppingPage() {
             className="flex-1 bg-transparent px-2 py-2 outline-none"
           />
           <button
-            onClick={() => handleAdd(false)}
-            disabled={!input.trim()}
-            className="p-2.5 rounded-xl hover:bg-ink-100 dark:hover:bg-ink-700 disabled:opacity-30 transition"
-            title="Einfach hinzufügen"
-          >
-            <Plus className="w-5 h-5" />
-          </button>
-          <button
             onClick={() => handleAdd(true)}
             disabled={!input.trim() || aiLoading}
             className="p-2.5 rounded-xl bg-gradient-to-br from-violet-500 to-pink-500 text-white disabled:opacity-30 hover:scale-105 transition"
@@ -253,7 +255,7 @@ export default function ShoppingPage() {
                     >
                       <button
                         onClick={() => toggleItem(item)}
-                        className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition ${
+                        className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition flex-shrink-0 ${
                           item.checked
                             ? 'bg-green-500 border-green-500'
                             : 'border-ink-200 dark:border-ink-700'
@@ -261,6 +263,9 @@ export default function ShoppingPage() {
                       >
                         {item.checked && <Check className="w-4 h-4 text-white" />}
                       </button>
+                      <div className="text-xl flex-shrink-0">
+                        {CATEGORY_ICONS[item.category] ?? '🛒'}
+                      </div>
                       <div className="flex-1 min-w-0">
                         <div
                           className={`font-medium ${
