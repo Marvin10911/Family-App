@@ -454,7 +454,7 @@ export default function RecipesPage() {
           <input value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && generateAI()}
             placeholder="z.B. Hähnchen mit Pasta und Tomaten…"
-            className="flex-1 bg-ink-100 dark:bg-ink-800 rounded-xl px-3 py-2.5 text-sm outline-none" />
+            className="input flex-1 text-sm py-2.5" />
           <button onClick={generateAI} disabled={!aiPrompt.trim() || aiLoading}
             className="px-4 py-2 rounded-xl bg-gradient-to-br from-violet-500 to-pink-500 text-white font-medium text-sm disabled:opacity-40 hover:scale-105 transition">
             {aiLoading ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : 'Erstellen'}
