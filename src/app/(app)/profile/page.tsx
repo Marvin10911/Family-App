@@ -35,6 +35,8 @@ export default function ProfilePage() {
   const [savingColor, setSavingColor] = useState(false);
 
   const [resetSent, setResetSent] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
 
   async function saveName() {
     if (!newName.trim() || !user || !profile) return;
@@ -62,9 +64,18 @@ export default function ProfilePage() {
   }
 
   async function handlePasswordReset() {
-    if (!profile?.email) return;
-    await sendPasswordReset(profile.email);
-    setResetSent(true);
+    if (!profile?.email || resetLoading) return;
+    setResetLoading(true);
+    setResetError(null);
+    try {
+      await sendPasswordReset(profile.email);
+      setResetSent(true);
+    } catch (err: any) {
+      setResetError('Fehler beim Senden. Bitte nochmal versuchen.');
+      console.error('[profile] password reset error:', err);
+    } finally {
+      setResetLoading(false);
+    }
   }
 
   async function handleSignOut() {
@@ -181,16 +192,20 @@ export default function ProfilePage() {
       >
         <button
           onClick={handlePasswordReset}
-          disabled={resetSent}
-          className="w-full flex items-center gap-3 px-5 py-4 text-left active:bg-ink-50 dark:active:bg-ink-800 transition-colors"
+          disabled={resetSent || resetLoading}
+          className="w-full flex items-center gap-3 px-5 py-4 text-left active:bg-ink-50 dark:active:bg-ink-800 transition-colors disabled:opacity-60"
         >
           <div className="w-9 h-9 rounded-xl bg-blue-100 dark:bg-blue-950 flex items-center justify-center flex-shrink-0">
             <KeyRound className="w-4.5 h-4.5 text-blue-600 dark:text-blue-400" />
           </div>
           <div className="flex-1">
             <div className="font-semibold text-sm">Passwort ändern</div>
-            {resetSent
-              ? <div className="text-xs text-green-600 dark:text-green-400">Reset-Link wurde gesendet ✓</div>
+            {resetLoading
+              ? <div className="text-xs text-ink-400">Wird gesendet…</div>
+              : resetSent
+              ? <div className="text-xs text-green-600 dark:text-green-400">Reset-Link gesendet ✓</div>
+              : resetError
+              ? <div className="text-xs text-red-500">{resetError}</div>
               : <div className="text-xs text-ink-500">Link per E-Mail erhalten</div>
             }
           </div>
