@@ -1,38 +1,45 @@
-import nodemailer from 'nodemailer';
-
 /**
- * Sends an email via Gmail SMTP (EMAIL_USER + EMAIL_APP_PASSWORD)
- * or Resend (RESEND_API_KEY) — whichever is configured.
- * Returns which method was used, or 'none' if neither is configured.
+ * Unified email sender. Tries providers in order:
+ *   1. Brevo HTTP API  (BREVO_API_KEY)              – free, no domain needed
+ *   2. Resend HTTP API (RESEND_API_KEY)              – requires verified domain
+ *   3. Gmail SMTP      (EMAIL_USER + EMAIL_APP_PASSWORD) – may be blocked by Vercel
+ * Returns which provider was used, or 'none' if none are configured.
  */
 export async function sendEmail(options: {
   to: string;
   subject: string;
   html: string;
-}): Promise<'gmail' | 'resend' | 'none'> {
+}): Promise<'brevo' | 'resend' | 'gmail' | 'none'> {
   const { to, subject, html } = options;
 
-  // ── Gmail SMTP ──────────────────────────────────────────────────────────────
-  if (process.env.EMAIL_USER && process.env.EMAIL_APP_PASSWORD) {
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_APP_PASSWORD,
+  // ── 1. Brevo (HTTP — works reliably on Vercel) ───────────────────────────
+  if (process.env.BREVO_API_KEY) {
+    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'api-key': process.env.BREVO_API_KEY,
+        'Content-Type': 'application/json',
       },
+      body: JSON.stringify({
+        sender: {
+          email: process.env.BREVO_FROM_EMAIL ?? process.env.EMAIL_USER ?? 'noreply@example.com',
+          name: 'Family App',
+        },
+        to: [{ email: to }],
+        subject,
+        htmlContent: html,
+      }),
     });
 
-    await transporter.sendMail({
-      from: `Family App <${process.env.EMAIL_USER}>`,
-      to,
-      subject,
-      html,
-    });
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`Brevo ${res.status}: ${body}`);
+    }
 
-    return 'gmail';
+    return 'brevo';
   }
 
-  // ── Resend ──────────────────────────────────────────────────────────────────
+  // ── 2. Resend (HTTP — requires verified domain) ──────────────────────────
   if (process.env.RESEND_API_KEY) {
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -54,6 +61,29 @@ export async function sendEmail(options: {
     }
 
     return 'resend';
+  }
+
+  // ── 3. Gmail SMTP (may be blocked on Vercel/serverless) ─────────────────
+  if (process.env.EMAIL_USER && process.env.EMAIL_APP_PASSWORD) {
+    const nodemailer = await import('nodemailer');
+    const transporter = nodemailer.createTransport({
+      host: 'smtp.gmail.com',
+      port: 465,
+      secure: true,
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_APP_PASSWORD,
+      },
+    });
+
+    await transporter.sendMail({
+      from: `Family App <${process.env.EMAIL_USER}>`,
+      to,
+      subject,
+      html,
+    });
+
+    return 'gmail';
   }
 
   return 'none';
