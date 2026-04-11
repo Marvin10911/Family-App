@@ -68,7 +68,15 @@ export default function ProfilePage() {
     setResetLoading(true);
     setResetError(null);
     try {
-      await sendPasswordReset(profile.email);
+      const res = await fetch('/api/auth/send-password-reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: profile.email }),
+      });
+      const data = await res.json();
+      if (data.method === 'firebase-fallback') {
+        await sendPasswordReset(profile.email);
+      }
       setResetSent(true);
     } catch (err: any) {
       setResetError('Fehler beim Senden. Bitte nochmal versuchen.');
