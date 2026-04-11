@@ -146,7 +146,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const cred = await signInWithEmailAndPassword(auth, email, password);
     if (!cred.user.emailVerified) {
       // Send a fresh verification email, then force sign-out
-      await sendEmailVerification(cred.user).catch(() => {});
+      await sendEmailVerification(cred.user, {
+        url: `${window.location.origin}/login?verified=true`,
+        handleCodeInApp: false,
+      }).catch(() => {});
       await fbSignOut(auth);
       throw Object.assign(new Error('E-Mail nicht bestätigt.'), {
         code: 'auth/email-not-verified',
@@ -171,6 +174,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         lastSeen: serverTimestamp(),
       });
 
+      const verificationSettings = {
+        url: `${window.location.origin}/login?verified=true`,
+        handleCodeInApp: false,
+      };
+
       // Try custom email via Resend; fall back to Firebase built-in
       try {
         const res = await fetch('/api/auth/send-verification', {
@@ -181,11 +189,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const data = await res.json();
         // If Resend not configured, Firebase fallback
         if (data.method === 'firebase-fallback') {
-          await sendEmailVerification(cred.user);
+          await sendEmailVerification(cred.user, verificationSettings);
         }
       } catch {
         // Last resort fallback
-        await sendEmailVerification(cred.user).catch(() => {});
+        await sendEmailVerification(cred.user, verificationSettings).catch(() => {});
       }
 
       await fbSignOut(auth);
@@ -194,7 +202,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const sendPasswordReset = useCallback(async (email: string) => {
-    await sendPasswordResetEmail(auth, email);
+    await sendPasswordResetEmail(auth, email, {
+      url: `${window.location.origin}/login`,
+      handleCodeInApp: false,
+    });
   }, []);
 
   const signOut = useCallback(async () => {
