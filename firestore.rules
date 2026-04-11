@@ -79,5 +79,10 @@ service cloud.firestore {
       allow read, write: if inFamily(resource.data.familyId);
       allow create: if isSignedIn() && callerFamilyId() == request.resource.data.familyId;
     }
+
+    match /birthdays/{id} {
+      allow read, write: if inFamily(resource.data.familyId);
+      allow create: if isSignedIn() && callerFamilyId() == request.resource.data.familyId;
+    }
   }
 }

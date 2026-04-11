@@ -9,6 +9,7 @@ import {
   useCalendarEvents,
   useWasteEntries,
   useRecipes,
+  useBirthdays,
 } from '@/hooks/use-family-data';
 import { useWeather } from '@/hooks/use-weather';
 import {
@@ -21,6 +22,7 @@ import {
   Users,
   Sparkles,
   BookOpen,
+  Cake,
 } from 'lucide-react';
 import { formatDateDE, getTimeGreeting, getTimeEmoji } from '@/lib/utils';
 import { WasteWidgetContent } from '@/components/dashboard/waste-widget-content';
@@ -37,7 +39,18 @@ export default function DashboardPage() {
   const { data: events } = useCalendarEvents();
   const { data: waste } = useWasteEntries();
   const { data: recipes } = useRecipes();
+  const { data: birthdays } = useBirthdays();
   const weather = useWeather();
+
+  function getDaysUntil(day: number, month: number) {
+    const today = new Date(); today.setHours(0,0,0,0);
+    let next = new Date(today.getFullYear(), month - 1, day);
+    if (next < today) next = new Date(today.getFullYear() + 1, month - 1, day);
+    return Math.round((next.getTime() - today.getTime()) / 86400000);
+  }
+  const upcomingBirthdays = [...birthdays]
+    .sort((a, b) => getDaysUntil(a.day, a.month) - getDaysUntil(b.day, b.month))
+    .slice(0, 3);
 
   const openShopping = shopping.filter((i) => !i.checked);
   const openTasks = tasks.filter((t) => !t.completed);
@@ -250,6 +263,34 @@ export default function DashboardPage() {
               </div>
             )}
           </div>
+        </Widget>
+
+        <Widget
+          href="/birthdays"
+          icon={Cake}
+          title="Geburtstage"
+          gradient="linear-gradient(135deg, #ec4899 0%, #d946ef 50%, #8b5cf6 100%)"
+          delay={0.35}
+        >
+          {upcomingBirthdays.length === 0 ? (
+            <div className="italic text-sm opacity-90">Keine eingetragen</div>
+          ) : (
+            <div className="space-y-1">
+              {upcomingBirthdays.map((b) => {
+                const days = getDaysUntil(b.day, b.month);
+                return (
+                  <div key={b.id} className="flex items-center justify-between gap-1">
+                    <span className="text-[13px] font-medium truncate">
+                      {b.emoji ?? '🎂'} {b.name}
+                    </span>
+                    <span className="text-[11px] bg-white/25 rounded px-1.5 py-0.5 backdrop-blur flex-shrink-0">
+                      {days === 0 ? 'Heute!' : days === 1 ? 'Morgen' : `${days}d`}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </Widget>
 
         <Widget
