@@ -167,8 +167,8 @@ export default function BirthdaysPage() {
                     isToday
                       ? 'bg-pink-500 text-white'
                       : isThisWeek
-                      ? 'bg-pink-100 text-pink-700 dark:bg-pink-950 dark:text-pink-300'
-                      : 'bg-ink-100 text-ink-600 dark:bg-ink-800 dark:text-ink-300'
+                      ? 'bg-pink-500 text-white'
+                      : 'bg-violet-600 text-white'
                   }`}>
                     {isToday ? 'Heute 🎉' : days === 1 ? 'Morgen' : `${days}d`}
                   </div>
