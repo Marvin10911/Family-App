@@ -97,11 +97,14 @@ export async function POST(req: NextRequest) {
           '✉️ Bestätige deine E-Mail – Family App',
           buildEmailHtml(displayName ?? 'dort', verifyUrl),
         );
+        console.log('[send-verification] Sent via Resend to', email);
         return NextResponse.json({ method: 'resend' });
       } catch (resendErr: any) {
-        console.error('[send-verification] Falling back to Firebase:', resendErr.message);
+        console.error('[send-verification] Resend failed, falling back to Firebase:', resendErr.message);
         // Fall through to Firebase fallback
       }
+    } else {
+      console.warn('[send-verification] RESEND_API_KEY not set – using Firebase fallback');
     }
 
     // Firebase fallback

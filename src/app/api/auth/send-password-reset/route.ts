@@ -78,11 +78,14 @@ export async function POST(req: NextRequest) {
     if (process.env.RESEND_API_KEY) {
       try {
         await sendResetEmail(email, resetLink);
+        console.log('[send-password-reset] Sent via Resend');
         return NextResponse.json({ method: 'resend' });
       } catch (resendErr: any) {
-        console.error('[send-password-reset] Falling back to Firebase:', resendErr.message);
+        console.error('[send-password-reset] Resend failed, falling back to Firebase:', resendErr.message);
         // Fall through to firebase-fallback
       }
+    } else {
+      console.warn('[send-password-reset] RESEND_API_KEY not set – using Firebase fallback');
     }
 
     return NextResponse.json({ method: 'firebase-fallback' });
