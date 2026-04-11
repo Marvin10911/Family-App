@@ -54,13 +54,17 @@ async function sendResetEmail(to: string, resetUrl: string) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: process.env.RESEND_FROM_EMAIL ?? 'Family App <noreply@resend.dev>',
+      from: process.env.RESEND_FROM_EMAIL ?? 'onboarding@resend.dev',
       to,
       subject: '🔐 Passwort zurücksetzen – Family App',
       html,
     }),
   });
-  if (!res.ok) throw new Error(`Resend error: ${await res.text()}`);
+  if (!res.ok) {
+    const body = await res.text();
+    console.error('[send-password-reset] Resend error:', res.status, body);
+    throw new Error(`Resend ${res.status}: ${body}`);
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -72,17 +76,21 @@ export async function POST(req: NextRequest) {
     const resetLink = await adminAuth.generatePasswordResetLink(email);
 
     if (process.env.RESEND_API_KEY) {
-      await sendResetEmail(email, resetLink);
-      return NextResponse.json({ method: 'resend' });
+      try {
+        await sendResetEmail(email, resetLink);
+        return NextResponse.json({ method: 'resend' });
+      } catch (resendErr: any) {
+        console.error('[send-password-reset] Falling back to Firebase:', resendErr.message);
+        // Fall through to firebase-fallback
+      }
     }
 
-    // Fallback: tell client to use Firebase directly
     return NextResponse.json({ method: 'firebase-fallback' });
   } catch (err: any) {
-    // Don't leak whether email exists
     if (err.code === 'auth/user-not-found') {
-      return NextResponse.json({ method: 'ok' }); // silent success
+      return NextResponse.json({ method: 'ok' }); // Don't leak whether email exists
     }
+    console.error('[send-password-reset] Error:', err.message);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
