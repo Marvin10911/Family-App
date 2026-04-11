@@ -230,6 +230,19 @@ export interface Recipe {
   createdAt: Timestamp | Date;
 }
 
+export interface Birthday {
+  id: string;
+  familyId: string;
+  name: string;
+  day: number;    // 1–31
+  month: number;  // 1–12
+  year?: number;  // Geburtsjahr für Altersberechnung (optional)
+  emoji?: string;
+  note?: string;
+  createdBy: string;
+  createdAt: Timestamp | Date;
+}
+
 export const WASTE_COLORS: Record<WasteType, string> = {
   Restmüll: '#6b7280',
   Biotonne: '#65a30d',

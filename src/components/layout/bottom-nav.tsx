@@ -9,7 +9,7 @@ import {
   UtensilsCrossed,
   BookOpen,
   Calendar,
-  Settings,
+  User,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -20,7 +20,7 @@ const items = [
   { href: '/recipes', label: 'Rezepte', icon: BookOpen },
   { href: '/meals', label: 'Essen', icon: UtensilsCrossed },
   { href: '/calendar', label: 'Kalender', icon: Calendar },
-  { href: '/admin', label: 'Einstell.', icon: Settings },
+  { href: '/profile', label: 'Profil', icon: User },
 ];
 
 export function BottomNav() {
