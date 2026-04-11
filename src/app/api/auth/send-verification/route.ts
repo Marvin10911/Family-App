@@ -1,28 +1,11 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { adminDb, adminAuth } from '@/lib/firebase/admin';
+import { adminDb } from '@/lib/firebase/admin';
+import { sendEmail } from '@/lib/email/mailer';
 import crypto from 'crypto';
 
-async function sendWithResend(to: string, subject: string, html: string) {
-  const from = process.env.RESEND_FROM_EMAIL ?? 'onboarding@resend.dev';
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ from, to, subject, html }),
-  });
-
-  if (!res.ok) {
-    const body = await res.text();
-    console.error('[send-verification] Resend error:', res.status, body);
-    throw new Error(`Resend ${res.status}: ${body}`);
-  }
-}
-
-function buildEmailHtml(displayName: string, verifyUrl: string) {
+function buildVerificationHtml(displayName: string, verifyUrl: string) {
   return `<!DOCTYPE html>
 <html lang="de">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
@@ -90,24 +73,22 @@ export async function POST(req: NextRequest) {
 
     const verifyUrl = `${getAppUrl()}/api/auth/verify-email?uid=${uid}&token=${token}`;
 
-    if (process.env.RESEND_API_KEY) {
-      try {
-        await sendWithResend(
-          email,
-          '✉️ Bestätige deine E-Mail – Family App',
-          buildEmailHtml(displayName ?? 'dort', verifyUrl),
-        );
-        console.log('[send-verification] Sent via Resend to', email);
-        return NextResponse.json({ method: 'resend' });
-      } catch (resendErr: any) {
-        console.error('[send-verification] Resend failed, falling back to Firebase:', resendErr.message);
-        // Fall through to Firebase fallback
+    try {
+      const method = await sendEmail({
+        to: email,
+        subject: '✉️ Bestätige deine E-Mail – Family App',
+        html: buildVerificationHtml(displayName ?? 'dort', verifyUrl),
+      });
+
+      if (method !== 'none') {
+        console.log(`[send-verification] Sent via ${method} to ${email}`);
+        return NextResponse.json({ method });
       }
-    } else {
-      console.warn('[send-verification] RESEND_API_KEY not set – using Firebase fallback');
+    } catch (emailErr: any) {
+      console.error('[send-verification] Email sending failed:', emailErr.message);
     }
 
-    // Firebase fallback
+    console.warn('[send-verification] No email provider configured – using Firebase fallback');
     return NextResponse.json({ method: 'firebase-fallback' });
   } catch (err: any) {
     console.error('[send-verification] Fatal error:', err.message);

@@ -2,9 +2,10 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { adminAuth } from '@/lib/firebase/admin';
+import { sendEmail } from '@/lib/email/mailer';
 
-async function sendResetEmail(to: string, resetUrl: string) {
-  const html = `<!DOCTYPE html>
+function buildResetHtml(resetUrl: string) {
+  return `<!DOCTYPE html>
 <html lang="de">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;padding:0;background:#f5f3ff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
@@ -46,25 +47,6 @@ async function sendResetEmail(to: string, resetUrl: string) {
   </table>
 </body>
 </html>`;
-
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      from: process.env.RESEND_FROM_EMAIL ?? 'onboarding@resend.dev',
-      to,
-      subject: '🔐 Passwort zurücksetzen – Family App',
-      html,
-    }),
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    console.error('[send-password-reset] Resend error:', res.status, body);
-    throw new Error(`Resend ${res.status}: ${body}`);
-  }
 }
 
 export async function POST(req: NextRequest) {
@@ -75,19 +57,22 @@ export async function POST(req: NextRequest) {
     // Generate Firebase reset link via Admin SDK
     const resetLink = await adminAuth.generatePasswordResetLink(email);
 
-    if (process.env.RESEND_API_KEY) {
-      try {
-        await sendResetEmail(email, resetLink);
-        console.log('[send-password-reset] Sent via Resend');
-        return NextResponse.json({ method: 'resend' });
-      } catch (resendErr: any) {
-        console.error('[send-password-reset] Resend failed, falling back to Firebase:', resendErr.message);
-        // Fall through to firebase-fallback
+    try {
+      const method = await sendEmail({
+        to: email,
+        subject: '🔐 Passwort zurücksetzen – Family App',
+        html: buildResetHtml(resetLink),
+      });
+
+      if (method !== 'none') {
+        console.log(`[send-password-reset] Sent via ${method}`);
+        return NextResponse.json({ method });
       }
-    } else {
-      console.warn('[send-password-reset] RESEND_API_KEY not set – using Firebase fallback');
+    } catch (emailErr: any) {
+      console.error('[send-password-reset] Email sending failed:', emailErr.message);
     }
 
+    console.warn('[send-password-reset] No email provider configured – using Firebase fallback');
     return NextResponse.json({ method: 'firebase-fallback' });
   } catch (err: any) {
     if (err.code === 'auth/user-not-found') {
