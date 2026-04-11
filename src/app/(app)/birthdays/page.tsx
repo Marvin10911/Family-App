@@ -54,8 +54,7 @@ export default function BirthdaysPage() {
   const [saving, setSaving] = useState(false);
 
   const sorted = sortByUpcoming(birthdays);
-  const today = sorted.filter((b) => getDaysUntil(b.day, b.month) === 0);
-  const upcoming = sorted.filter((b) => getDaysUntil(b.day, b.month) > 0);
+  const todayBirthdays = sorted.filter((b) => getDaysUntil(b.day, b.month) === 0);
 
   async function addBirthday() {
     if (!name.trim() || !profile?.familyId) return;
@@ -105,28 +104,25 @@ export default function BirthdaysPage() {
         </motion.button>
       </div>
 
-      {/* Today's birthdays */}
-      {today.length > 0 && (
+      {/* Today's birthdays banner */}
+      {todayBirthdays.length > 0 && (
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           className="rounded-3xl p-5 text-white text-center shadow-lg"
           style={{ background: 'linear-gradient(135deg, #ec4899, #8b5cf6)' }}
         >
-          <div className="text-4xl mb-2">{today[0].emoji ?? '🎂'}</div>
-          <div className="font-bold text-xl">Alles Gute, {today[0].name}!</div>
-          {today[0].year && (
+          <div className="text-4xl mb-2">{todayBirthdays[0].emoji ?? '🎂'}</div>
+          <div className="font-bold text-xl">Alles Gute, {todayBirthdays[0].name}!</div>
+          {todayBirthdays[0].year && (
             <div className="text-sm opacity-85 mt-1">
-              Wird heute {getAge(today[0].year, today[0].day, today[0].month)} Jahre alt 🎉
+              Wird heute {getAge(todayBirthdays[0].year, todayBirthdays[0].day, todayBirthdays[0].month)} Jahre alt 🎉
             </div>
           )}
-          {today.slice(1).map((b) => (
-            <div key={b.id} className="mt-2 font-semibold">🎂 {b.name}</div>
-          ))}
         </motion.div>
       )}
 
-      {/* List */}
+      {/* Full list — alle Einträge inkl. heute, mit Löschen */}
       {loading ? (
         <div className="text-center text-ink-400 py-10">Lädt…</div>
       ) : sorted.length === 0 ? (
@@ -142,9 +138,10 @@ export default function BirthdaysPage() {
       ) : (
         <div className="space-y-2">
           <AnimatePresence>
-            {upcoming.map((b, i) => {
+            {sorted.map((b, i) => {
               const days = getDaysUntil(b.day, b.month);
-              const isThisWeek = days <= 7;
+              const isToday = days === 0;
+              const isThisWeek = days > 0 && days <= 7;
               return (
                 <motion.div
                   key={b.id}
@@ -152,26 +149,32 @@ export default function BirthdaysPage() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, x: -20 }}
                   transition={{ delay: i * 0.04 }}
-                  className="glass rounded-2xl px-4 py-3.5 flex items-center gap-3 shadow-sm"
+                  className={`rounded-2xl px-4 py-3.5 flex items-center gap-3 shadow-sm ${
+                    isToday
+                      ? 'bg-gradient-to-r from-pink-50 to-violet-50 dark:from-pink-950/30 dark:to-violet-950/30 border border-pink-200 dark:border-pink-800'
+                      : 'glass'
+                  }`}
                 >
                   <div className="text-2xl w-10 text-center flex-shrink-0">{b.emoji ?? '🎂'}</div>
                   <div className="flex-1 min-w-0">
                     <div className="font-semibold truncate">{b.name}</div>
                     <div className="text-xs text-ink-500 mt-0.5">
                       {b.day}. {MONTH_NAMES[b.month - 1]}
-                      {b.year && ` · ${getAge(b.year, b.day, b.month) + 1} Jahre`}
+                      {b.year && ` · ${isToday ? getAge(b.year, b.day, b.month) : getAge(b.year, b.day, b.month) + 1} Jahre`}
                     </div>
                   </div>
                   <div className={`text-xs font-bold px-2.5 py-1.5 rounded-xl flex-shrink-0 ${
-                    isThisWeek
+                    isToday
+                      ? 'bg-pink-500 text-white'
+                      : isThisWeek
                       ? 'bg-pink-100 text-pink-700 dark:bg-pink-950 dark:text-pink-300'
                       : 'bg-ink-100 text-ink-600 dark:bg-ink-800 dark:text-ink-300'
                   }`}>
-                    {days === 1 ? 'Morgen' : `${days}d`}
+                    {isToday ? 'Heute 🎉' : days === 1 ? 'Morgen' : `${days}d`}
                   </div>
                   <button
                     onClick={() => deleteBirthday(b.id)}
-                    className="w-8 h-8 rounded-xl bg-red-50 dark:bg-red-950/30 flex items-center justify-center text-red-400 flex-shrink-0"
+                    className="w-8 h-8 rounded-xl bg-red-50 dark:bg-red-950/30 flex items-center justify-center text-red-400 flex-shrink-0 active:scale-90 transition-transform"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
