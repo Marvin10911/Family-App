@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
+import { notifyFamily } from '@/lib/notifications/fcm';
 
 const PRIORITY_COLORS: Record<TaskPriority, string> = {
   low: 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300',
@@ -59,9 +60,10 @@ export default function TasksPage() {
 
   async function addTask() {
     if (!newTitle.trim() || !profile?.familyId) return;
+    const title = newTitle.trim();
     await addDoc(collection(db, 'tasks'), {
       familyId: profile.familyId,
-      title: newTitle.trim(),
+      title,
       assignedTo: [profile.id],
       priority,
       completed: false,
@@ -72,6 +74,13 @@ export default function TasksPage() {
       createdAt: serverTimestamp(),
     });
     setNewTitle('');
+    notifyFamily(
+      profile.familyId,
+      '✅ Neue Aufgabe',
+      `${profile.displayName} hat "${title}" hinzugefügt`,
+      '/tasks',
+      profile.id,
+    );
   }
 
   async function generateAITasks() {

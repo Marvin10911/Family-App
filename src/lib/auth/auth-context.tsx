@@ -13,11 +13,12 @@ import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  sendEmailVerification,
+  sendPasswordResetEmail,
   signOut as fbSignOut,
   updateProfile,
   User as FbUser,
-} from 'firebase/auth';
-import {
+} from 'firebase/auth';import {
   doc,
   getDoc,
   setDoc,
@@ -37,6 +38,7 @@ interface AuthContextValue {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, displayName: string) => Promise<void>;
   signOut: () => Promise<void>;
+  sendPasswordReset: (email: string) => Promise<void>;
   refreshProfile: () => Promise<void>;
   refreshFamily: () => Promise<void>;
 }
@@ -65,14 +67,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         profileUnsubRef.current = null;
       }
 
-      setUser(fbUser);
-
       if (!fbUser) {
+        setUser(null);
         setProfile(null);
         setFamily(null);
         setLoading(false);
         return;
       }
+
+      // Block unverified users — treat them as not logged in
+      if (!fbUser.emailVerified) {
+        setUser(null);
+        setProfile(null);
+        setFamily(null);
+        setLoading(false);
+        return;
+      }
+
+      setUser(fbUser);
 
       // Subscribe to the user's profile document
       const userRef = doc(db, 'users', fbUser.uid);
@@ -131,8 +143,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signIn = useCallback(async (email: string, password: string) => {
-    await signInWithEmailAndPassword(auth, email, password);
-    // loading will be set to false by the onSnapshot callback above
+    const cred = await signInWithEmailAndPassword(auth, email, password);
+    if (!cred.user.emailVerified) {
+      // Send a fresh verification email, then force sign-out
+      await sendEmailVerification(cred.user, {
+        url: `${window.location.origin}/login?verified=true`,
+        handleCodeInApp: false,
+      }).catch(() => {});
+      await fbSignOut(auth);
+      throw Object.assign(new Error('E-Mail nicht bestätigt.'), {
+        code: 'auth/email-not-verified',
+      });
+    }
   }, []);
 
   const signUp = useCallback(
@@ -151,10 +173,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         createdAt: serverTimestamp(),
         lastSeen: serverTimestamp(),
       });
-      // The onSnapshot listener will pick up the new doc and set loading=false
+
+      const verificationSettings = {
+        url: `${window.location.origin}/login?verified=true`,
+        handleCodeInApp: false,
+      };
+
+      // Try custom email via Resend; fall back to Firebase built-in
+      try {
+        const res = await fetch('/api/auth/send-verification', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ uid: cred.user.uid, email, displayName }),
+        });
+        const data = await res.json();
+        // If Resend not configured, Firebase fallback
+        if (data.method === 'firebase-fallback') {
+          await sendEmailVerification(cred.user, verificationSettings);
+        }
+      } catch {
+        // Last resort fallback
+        await sendEmailVerification(cred.user, verificationSettings).catch(() => {});
+      }
+
+      await fbSignOut(auth);
     },
     []
   );
+
+  const sendPasswordReset = useCallback(async (email: string) => {
+    await sendPasswordResetEmail(auth, email, {
+      url: `${window.location.origin}/login`,
+      handleCodeInApp: false,
+    });
+  }, []);
 
   const signOut = useCallback(async () => {
     await fbSignOut(auth);
@@ -180,7 +232,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, profile, family, loading, signIn, signUp, signOut, refreshProfile, refreshFamily }}
+      value={{ user, profile, family, loading, signIn, signUp, signOut, sendPasswordReset, refreshProfile, refreshFamily }}
     >
       {children}
     </AuthContext.Provider>

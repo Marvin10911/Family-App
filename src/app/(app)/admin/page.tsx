@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth/auth-context';
 import {
@@ -10,6 +10,7 @@ import {
   updateUserRole,
   removeFamilyMember,
 } from '@/lib/family/family-service';
+import { registerFcmToken } from '@/lib/notifications/fcm';
 import { UserProfile, UserRole } from '@/types';
 import {
   Settings,
@@ -44,6 +45,22 @@ export default function AdminPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark' | 'auto'>('auto');
+  const [notifStatus, setNotifStatus] = useState<'unknown' | 'granted' | 'denied' | 'unsupported' | 'loading'>('unknown');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      setNotifStatus(Notification.permission as any);
+    } else {
+      setNotifStatus('unsupported');
+    }
+  }, []);
+
+  async function enableNotifications() {
+    if (!profile?.id) return;
+    setNotifStatus('loading');
+    const result = await registerFcmToken(profile.id);
+    setNotifStatus(result);
+  }
 
   useEffect(() => {
     if (family?.members) {
@@ -266,30 +283,66 @@ export default function AdminPage() {
         )}
 
         {tab === 'notifications' && (
-          <div className="card">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="font-medium">Push-Benachrichtigungen</div>
-                <div className="text-xs text-ink-500 mt-0.5">
-                  Erhalte Benachrichtigungen bei neuen Einträgen und Müllterminen
+          <div className="space-y-3">
+            <div className="card space-y-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="font-semibold">Push-Benachrichtigungen</div>
+                  <div className="text-xs text-ink-500 mt-0.5">
+                    Erhalte Erinnerungen für Müll, Termine und neue Aufgaben
+                  </div>
                 </div>
+                {notifStatus === 'granted' ? (
+                  <div className="flex-shrink-0 px-3 py-1.5 rounded-xl bg-green-100 dark:bg-green-950/30 text-green-700 dark:text-green-400 text-xs font-semibold">
+                    ✓ Aktiv
+                  </div>
+                ) : notifStatus === 'denied' ? (
+                  <div className="flex-shrink-0 px-3 py-1.5 rounded-xl bg-red-100 dark:bg-red-950/30 text-red-600 dark:text-red-400 text-xs font-semibold">
+                    Blockiert
+                  </div>
+                ) : notifStatus === 'unsupported' ? (
+                  <div className="flex-shrink-0 px-3 py-1.5 rounded-xl bg-ink-100 dark:bg-ink-800 text-ink-500 text-xs font-semibold">
+                    Nicht unterstützt
+                  </div>
+                ) : (
+                  <button
+                    onClick={enableNotifications}
+                    disabled={notifStatus === 'loading'}
+                    className="flex-shrink-0 btn-primary disabled:opacity-50"
+                  >
+                    {notifStatus === 'loading' ? (
+                      <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      'Aktivieren'
+                    )}
+                  </button>
+                )}
               </div>
-              <button
-                onClick={async () => {
-                  if ('Notification' in window) {
-                    const perm = await Notification.requestPermission();
-                    if (perm === 'granted') {
-                      new Notification('Family App', {
-                        body: 'Benachrichtigungen sind jetzt aktiv!',
-                      });
-                    }
-                  }
-                }}
-                className="btn-primary"
-              >
-                Aktivieren
-              </button>
+              {notifStatus === 'denied' && (
+                <p className="text-xs text-ink-500 bg-ink-50 dark:bg-ink-800 rounded-xl px-3 py-2">
+                  Benachrichtigungen sind im Browser blockiert. Erlaube sie in den Browser-Einstellungen unter Datenschutz → Benachrichtigungen.
+                </p>
+              )}
             </div>
+
+            {notifStatus === 'granted' && (
+              <div className="card space-y-3">
+                <div className="text-sm font-semibold text-ink-700 dark:text-ink-300">Was du bekommst</div>
+                {[
+                  { icon: '🗑️', title: 'Müll-Erinnerung', desc: 'Jeden Abend, wenn morgen Müll abgeholt wird' },
+                  { icon: '📅', title: 'Kalender-Erinnerung', desc: 'Jeden Abend für Termine am nächsten Tag' },
+                  { icon: '✅', title: 'Neue Aufgaben', desc: 'Wenn ein Familienmitglied eine Aufgabe erstellt' },
+                ].map((item) => (
+                  <div key={item.title} className="flex items-center gap-3">
+                    <span className="text-xl">{item.icon}</span>
+                    <div>
+                      <div className="text-sm font-medium">{item.title}</div>
+                      <div className="text-xs text-ink-500">{item.desc}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

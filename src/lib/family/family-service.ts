@@ -5,11 +5,13 @@ import {
   getDoc,
   getDocs,
   updateDoc,
+  deleteDoc,
   query,
   where,
   serverTimestamp,
   arrayUnion,
   arrayRemove,
+  writeBatch,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import { Family, DEFAULT_PERMISSIONS, UserRole } from '@/types';
@@ -108,6 +110,29 @@ export async function removeFamilyMember(familyId: string, userId: string) {
     familyId: null,
     role: 'owner',
   });
+}
+
+export async function deleteFamily(familyId: string, memberIds: string[]) {
+  const batch = writeBatch(db);
+
+  // Reset all members' familyId
+  for (const uid of memberIds) {
+    batch.update(doc(db, 'users', uid), { familyId: null, role: 'owner' });
+  }
+
+  // Delete the family document
+  batch.delete(doc(db, 'families', familyId));
+
+  await batch.commit();
+
+  // Delete all family data collections (fire-and-forget, best effort)
+  const collections = ['shoppingItems', 'tasks', 'mealPlans', 'calendarEvents', 'wasteEntries', 'recipes'];
+  for (const col of collections) {
+    const snap = await getDocs(query(collection(db, col), where('familyId', '==', familyId)));
+    const dataBatch = writeBatch(db);
+    snap.docs.forEach((d) => dataBatch.delete(d.ref));
+    if (snap.docs.length > 0) await dataBatch.commit();
+  }
 }
 
 export async function getFamilyMembers(memberIds: string[]) {

@@ -5,14 +5,14 @@ import { useAuth } from '@/lib/auth/auth-context';
 import { useRecipes } from '@/hooks/use-family-data';
 import { useShoppingItems } from '@/hooks/use-family-data';
 import {
-  collection, doc, addDoc, updateDoc, deleteDoc, serverTimestamp, writeBatch,
+  collection, doc, addDoc, updateDoc, deleteDoc, setDoc, serverTimestamp, writeBatch,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import { Recipe, RecipeCategory, RecipeIngredient } from '@/types';
 import { getItemEmoji } from '@/lib/utils';
 import {
   BookOpen, Sparkles, Plus, X, Heart, Clock, Users, ChevronRight,
-  ShoppingCart, Search, Trash2, ArrowLeft, Check,
+  ShoppingCart, Search, Trash2, ArrowLeft, Check, CalendarDays,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -51,6 +51,10 @@ export default function RecipesPage() {
   });
   const [error, setError] = useState<string | null>(null);
   const [addedToCart, setAddedToCart] = useState(false);
+  const [showMealPicker, setShowMealPicker] = useState(false);
+  const [mealPickerDate, setMealPickerDate] = useState('');
+  const [mealPickerSlot, setMealPickerSlot] = useState<'lunch' | 'dinner'>('dinner');
+  const [mealSaved, setMealSaved] = useState(false);
 
   const filtered = useMemo(() => {
     let list = [...recipes];
@@ -160,6 +164,38 @@ export default function RecipesPage() {
     await batch.commit();
     setAddedToCart(true);
     setTimeout(() => setAddedToCart(false), 2500);
+  }
+
+  function getWeekDates() {
+    const today = new Date();
+    const day = today.getDay();
+    const monday = new Date(today);
+    monday.setDate(today.getDate() - ((day + 6) % 7));
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      return d.toISOString().slice(0, 10);
+    });
+  }
+
+  const DAY_LABELS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+
+  function openMealPicker() {
+    setMealPickerDate(new Date().toISOString().slice(0, 10));
+    setMealPickerSlot('dinner');
+    setMealSaved(false);
+    setShowMealPicker(true);
+  }
+
+  async function addToMealPlan() {
+    if (!profile?.familyId || !selected || !mealPickerDate) return;
+    await setDoc(
+      doc(db, 'mealPlans', `${profile.familyId}_${mealPickerDate}`),
+      { familyId: profile.familyId, date: mealPickerDate, [mealPickerSlot]: selected.name },
+      { merge: true },
+    );
+    setMealSaved(true);
+    setTimeout(() => { setMealSaved(false); setShowMealPicker(false); }, 2000);
   }
 
   // ── List view ──────────────────────────────────────────────────────────────
@@ -277,15 +313,92 @@ export default function RecipesPage() {
         </div>
       </div>
 
-      {/* Add to cart */}
-      <button onClick={() => addIngredientsToCart(selected)}
-        className={`w-full py-3.5 rounded-2xl font-semibold flex items-center justify-center gap-2 transition shadow-widget ${
-          addedToCart
-            ? 'bg-green-500 text-white'
-            : 'bg-gradient-to-r from-rose-500 to-orange-400 text-white hover:scale-[1.01]'
-        }`}>
-        {addedToCart ? <><Check className="w-5 h-5" /> Zur Einkaufsliste hinzugefügt!</> : <><ShoppingCart className="w-5 h-5" /> Zutaten auf Einkaufsliste</>}
-      </button>
+      {/* Action buttons */}
+      <div className="flex gap-3">
+        <button onClick={() => addIngredientsToCart(selected)}
+          className={`flex-1 py-3.5 rounded-2xl font-semibold flex items-center justify-center gap-2 transition shadow-widget ${
+            addedToCart
+              ? 'bg-green-500 text-white'
+              : 'bg-gradient-to-r from-rose-500 to-orange-400 text-white hover:scale-[1.01]'
+          }`}>
+          {addedToCart ? <><Check className="w-4 h-4" /> Hinzugefügt!</> : <><ShoppingCart className="w-4 h-4" /> Einkaufsliste</>}
+        </button>
+        <button onClick={openMealPicker}
+          className="flex-1 py-3.5 rounded-2xl font-semibold flex items-center justify-center gap-2 transition shadow-widget bg-gradient-to-r from-violet-500 to-indigo-500 text-white hover:scale-[1.01]">
+          <CalendarDays className="w-4 h-4" /> Essensplan
+        </button>
+      </div>
+
+      {/* Meal plan picker */}
+      <AnimatePresence>
+        {showMealPicker && (
+          <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
+            className="card space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="font-semibold flex items-center gap-2">
+                <CalendarDays className="w-4 h-4 text-violet-500" /> Tag auswählen
+              </div>
+              <button onClick={() => setShowMealPicker(false)} className="text-ink-400 hover:text-ink-600">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Day selector */}
+            <div className="grid grid-cols-7 gap-1">
+              {getWeekDates().map((date, i) => {
+                const d = new Date(date + 'T12:00:00');
+                const isSelected = date === mealPickerDate;
+                const isToday = date === new Date().toISOString().slice(0, 10);
+                return (
+                  <button key={date} onClick={() => setMealPickerDate(date)}
+                    className={`flex flex-col items-center py-2 rounded-xl transition text-xs font-medium ${
+                      isSelected
+                        ? 'bg-violet-500 text-white'
+                        : isToday
+                        ? 'bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-300'
+                        : 'bg-ink-100 dark:bg-ink-800 text-ink-600 dark:text-ink-300'
+                    }`}>
+                    <span className="text-[10px] opacity-80">{DAY_LABELS[i]}</span>
+                    <span className="font-bold">{d.getDate()}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Slot toggle */}
+            <div className="flex rounded-xl overflow-hidden border border-ink-200 dark:border-ink-700">
+              <button onClick={() => setMealPickerSlot('lunch')}
+                className={`flex-1 py-2.5 text-sm font-medium transition ${
+                  mealPickerSlot === 'lunch'
+                    ? 'bg-violet-500 text-white'
+                    : 'text-ink-500 hover:bg-ink-100 dark:hover:bg-ink-800'
+                }`}>
+                ☀️ Mittag
+              </button>
+              <button onClick={() => setMealPickerSlot('dinner')}
+                className={`flex-1 py-2.5 text-sm font-medium transition ${
+                  mealPickerSlot === 'dinner'
+                    ? 'bg-violet-500 text-white'
+                    : 'text-ink-500 hover:bg-ink-100 dark:hover:bg-ink-800'
+                }`}>
+                🌙 Abend
+              </button>
+            </div>
+
+            {/* Confirm */}
+            <button onClick={addToMealPlan}
+              className={`w-full py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition ${
+                mealSaved
+                  ? 'bg-green-500 text-white'
+                  : 'bg-violet-500 text-white hover:bg-violet-600'
+              }`}>
+              {mealSaved
+                ? <><Check className="w-4 h-4" /> Eingeplant!</>
+                : <><CalendarDays className="w-4 h-4" /> Einplanen</>}
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Ingredients */}
       <div className="card space-y-3">
@@ -341,7 +454,7 @@ export default function RecipesPage() {
           <input value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && generateAI()}
             placeholder="z.B. Hähnchen mit Pasta und Tomaten…"
-            className="flex-1 bg-ink-100 dark:bg-ink-800 rounded-xl px-3 py-2.5 text-sm outline-none" />
+            className="input flex-1 text-sm py-2.5" />
           <button onClick={generateAI} disabled={!aiPrompt.trim() || aiLoading}
             className="px-4 py-2 rounded-xl bg-gradient-to-br from-violet-500 to-pink-500 text-white font-medium text-sm disabled:opacity-40 hover:scale-105 transition">
             {aiLoading ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : 'Erstellen'}
